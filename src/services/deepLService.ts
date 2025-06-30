@@ -36,7 +36,7 @@ class DeepLService {
   }
 
   async initializeLanguages(): Promise<void> {
-    // Always initialize fallback languages first
+    // Initialize fallback languages first
     this.initializeFallbackLanguages();
 
     // If no API key is configured, skip API calls
@@ -45,6 +45,10 @@ class DeepLService {
       return;
     }
 
+    // NOTE: API connectivity tests were intentionally removed to improve startup performance.
+    // The FSM Orchestrator and agent system handle API management without upfront testing.
+    // DO NOT reintroduce testApiConnectivity() calls here - see ARCHITECTURE.md for details.
+    
     try {
       // Try to get languages from API
       const [sourceLanguages, targetLanguages] = await Promise.all([

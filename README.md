@@ -53,6 +53,14 @@ npm run dev
 - **Beautiful UI** - Modern, responsive design
 - **Finite State Machine Architecture** - Robust state management for the translation process
 
+## 🏗️ Architecture
+
+### **FSM Orchestrator Design**
+- **No Startup API Tests**: The application uses an orchestrator-based architecture that handles API management without testing connectivity on startup
+- **Lazy API Validation**: APIs are validated only when needed during actual translation/transcription requests
+- **Graceful Fallbacks**: Services automatically handle API unavailability with built-in fallback mechanisms
+- **Efficient Initialization**: Faster startup times by eliminating redundant connectivity checks
+
 ## 🔧 Troubleshooting
 
 ### **"API Keys Required" Error**
@@ -68,7 +76,7 @@ npm run dev
 ### **Translation Errors**
 - Verify your DeepL API key is active
 - Check your DeepL usage limits
-- Ensure you have internet connectivity
+- The orchestrator will handle API errors gracefully without requiring restart
 
 ## 📱 Usage
 
@@ -84,9 +92,10 @@ npm run dev
 - **Speech-to-Text**: Groq AI with Agentic Tooling
 - **Translation**: DeepL AI API with Groq as fallback
 - **Text-to-Speech**: ElevenLabs API
-- **State Management**: Finite State Machine Architecture
+- **State Management**: FSM Orchestrator with lazy API validation
 - **Database**: Neon PostgreSQL (optional)
 - **Build Tool**: Vite
+- **Architecture**: Service orchestration without startup API testing
 
 ## 🔒 Privacy & Security
 
