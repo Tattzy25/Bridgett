@@ -1,12 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
 import ElevenLabsService from '../services/elevenLabsService';
-import GeminiService from '../services/geminiService';
+import GroqService from '../services/groqService';
 import DeepLService from '../services/deepLService';
 import AudioRecorder from '../services/audioRecorder';
 
 interface TranslationError {
   message: string;
-  service: 'elevenlabs' | 'gemini' | 'deepl' | 'recorder' | 'general';
+  service: 'elevenlabs' | 'groq' | 'deepl' | 'recorder' | 'general';
   timestamp: Date;
 }
 
@@ -29,7 +29,7 @@ export const useTranslationServices = (): UseTranslationServicesReturn => {
   const [supportedLanguages, setSupportedLanguages] = useState<Array<{ code: string; name: string; flag: string }>>([]);
 
   const elevenLabsRef = useRef<ElevenLabsService | null>(null);
-  const geminiRef = useRef<GeminiService | null>(null);
+  const groqRef = useRef<GroqService | null>(null);
   const deepLRef = useRef<DeepLService | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
 
@@ -39,8 +39,8 @@ export const useTranslationServices = (): UseTranslationServicesReturn => {
       if (!elevenLabsRef.current) {
         elevenLabsRef.current = new ElevenLabsService();
       }
-      if (!geminiRef.current) {
-        geminiRef.current = new GeminiService();
+      if (!groqRef.current) {
+        groqRef.current = new GroqService();
       }
       if (!deepLRef.current) {
         deepLRef.current = new DeepLService();
@@ -128,8 +128,8 @@ export const useTranslationServices = (): UseTranslationServicesReturn => {
         throw new Error('Audio recorder not initialized');
       }
 
-      if (!geminiRef.current) {
-        throw new Error('Gemini service not initialized');
+      if (!groqRef.current) {
+        throw new Error('Groq service not initialized');
       }
 
       if (!deepLRef.current) {
@@ -140,8 +140,8 @@ export const useTranslationServices = (): UseTranslationServicesReturn => {
       const audioBlob = await recorderRef.current.stopRecording();
       setIsRecording(false);
 
-      // Transcribe audio using Gemini (speech-to-text)
-      const originalText = await geminiRef.current.transcribeAudio(audioBlob, fromLang);
+      // Transcribe audio using Groq (speech-to-text)
+      const originalText = await groqRef.current.transcribeAudio(audioBlob, fromLang);
 
       if (!originalText.trim()) {
         throw new Error('No speech detected in the recording');
@@ -163,8 +163,8 @@ export const useTranslationServices = (): UseTranslationServicesReturn => {
       const error = err as Error;
       let service: TranslationError['service'] = 'general';
 
-      if (error.message.includes('Gemini') || error.message.includes('transcribe')) {
-        service = 'gemini';
+      if (error.message.includes('Groq') || error.message.includes('transcribe')) {
+        service = 'groq';
       } else if (error.message.includes('DeepL') || error.message.includes('translate')) {
         service = 'deepl';
       } else if (error.message.includes('recording')) {

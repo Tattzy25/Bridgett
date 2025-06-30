@@ -9,6 +9,7 @@ interface DatabaseError {
 interface UseNeonDatabaseReturn {
   isConnected: boolean;
   currentSessionId: string | null;
+  sessionId: string | null; // Alias for currentSessionId for backward compatibility
   error: DatabaseError | null;
   initializeDatabase: () => Promise<void>;
   startNewSession: (user1Lang: string, user2Lang: string, user1Voice: string, user2Voice: string) => Promise<string>;
@@ -184,11 +185,12 @@ export const useNeonDatabase = (): UseNeonDatabaseReturn => {
   return {
     isConnected,
     currentSessionId,
+    sessionId: currentSessionId, // Alias for backward compatibility
     error,
     initializeDatabase,
     startNewSession,
     saveTranslation,
     endCurrentSession,
-    clearError,
+    clearError
   };
 };

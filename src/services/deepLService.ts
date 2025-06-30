@@ -13,10 +13,6 @@ interface DeepLTranslationResponse {
   }>;
 }
 
-interface DeepLLanguagesResponse {
-  source?: DeepLLanguage[];
-  target?: DeepLLanguage[];
-}
 
 interface DeepLUsageResponse {
   character_count: number;
@@ -50,9 +46,6 @@ class DeepLService {
     }
 
     try {
-      // Test API connectivity with a simple request first
-      await this.testApiConnectivity();
-      
       // Try to get languages from API
       const [sourceLanguages, targetLanguages] = await Promise.all([
         this.getSourceLanguages(),
@@ -89,37 +82,7 @@ class DeepLService {
     }
   }
 
-  private async testApiConnectivity(): Promise<void> {
-    try {
-      const response = await fetch(`${this.baseUrl}/usage`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-      });
 
-      if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error('Invalid DeepL API key');
-        } else if (response.status === 429) {
-          throw new Error('DeepL API rate limit exceeded');
-        } else {
-          throw new Error(`DeepL API error: ${response.status} ${response.statusText}`);
-        }
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.name === 'TimeoutError') {
-          throw new Error('DeepL API request timed out');
-        } else if (error.message.includes('Failed to fetch')) {
-          throw new Error('Network error: Unable to connect to DeepL API');
-        }
-      }
-      throw error;
-    }
-  }
 
   private initializeFallbackLanguages(): void {
     const fallbackLanguages: DeepLLanguage[] = [

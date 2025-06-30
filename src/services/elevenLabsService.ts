@@ -21,10 +21,6 @@ class ElevenLabsService {
   constructor() {
     this.apiKey = getApiKey('ELEVENLABS_API_KEY');
     this.defaultVoiceId = getApiKey('ELEVENLABS_VOICE_ID') || '1GvTxqTIRSoKAPZZYJJe';
-    
-    if (!this.apiKey) {
-      throw new Error('ElevenLabs API key is required');
-    }
   }
 
   async getVoices(): Promise<ElevenLabsVoice[]> {
@@ -100,7 +96,7 @@ class ElevenLabsService {
       
       return new Promise((resolve, reject) => {
         source.onended = () => resolve();
-        source.onerror = () => reject(new Error('Audio playback failed'));
+        source.addEventListener('error', () => reject(new Error('Audio playback failed')));
         source.start(0);
       });
     } catch (error) {

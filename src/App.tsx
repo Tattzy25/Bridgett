@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, Volume2, Settings, Users, Globe, AlertCircle, Database, Sparkles, Brain, Key, Edit3 } from 'lucide-react';
-import { useTranslationServices } from './hooks/useTranslationServices';
+import { Mic, MicOff, Volume2, Settings, Users, Database, Sparkles, Brain } from 'lucide-react';
+import { useFSMTranslation } from './hooks/useFSMTranslation';
 import { useNeonDatabase } from './hooks/useNeonDatabase';
-import { validateApiKeys } from './config/apiKeys';
 import ErrorBoundary from './components/ErrorBoundary';
-import ErrorAlert from './components/ErrorAlert';
 import LoadingSpinner from './components/LoadingSpinner';
+import MobileMenu from './components/MobileMenu';
+import DesktopLayout from './components/DesktopLayout';
+import './components/MobileMenu.css';
+import ErrorAlert from './components/ErrorAlert';
 
 interface Language {
   code: string;
@@ -44,10 +46,9 @@ function App() {
   });
   const [currentSpeaker, setCurrentSpeaker] = useState<'user1' | 'user2' | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [showApiKeyEditor, setShowApiKeyEditor] = useState(false);
   const [apiKeysConfigured, setApiKeysConfigured] = useState(false);
   const [languagesInitialized, setLanguagesInitialized] = useState(false);
-  const [missingKeys, setMissingKeys] = useState<string[]>([]);
+  const [isMobile, setIsMobile] = useState(false);
 
   const {
     isProcessing,
@@ -55,34 +56,28 @@ function App() {
     supportedLanguages,
     startRecording,
     stopRecordingAndTranslate,
-    playTranslation,
     clearError: clearTranslationError,
     isRecording,
-    initializeLanguages,
-  } = useTranslationServices();
+    originalText,
+    translatedText,
+    setFromLanguage,
+    setToLanguage,
+    setVoiceId
+  } = useFSMTranslation();
 
   const {
     isConnected: isDatabaseConnected,
     currentSessionId,
     error: databaseError,
     startNewSession,
-    saveTranslation,
     clearError: clearDatabaseError,
   } = useNeonDatabase();
 
   useEffect(() => {
-    // Check if API keys are configured
-    const validation = validateApiKeys();
-    setMissingKeys(validation.missing);
-    setApiKeysConfigured(validation.valid);
-
-    if (validation.valid) {
-      // Initialize languages from DeepL
-      initializeLanguages().then(() => {
-        setLanguagesInitialized(true);
-      }).catch(console.error);
-    }
-  }, [initializeLanguages]);
+    // Always proceed with initialization - let orchestrator handle API keys
+    setApiKeysConfigured(true);
+    setLanguagesInitialized(true);
+  }, []);
 
   // Set default languages once they're loaded
   useEffect(() => {
@@ -92,8 +87,12 @@ function App() {
       
       setUser1Language(english || supportedLanguages[0]);
       setUser2Language(spanish || supportedLanguages[1] || supportedLanguages[0]);
+      
+      // Set initial languages in the FSM
+      if (english) setFromLanguage(english.code);
+      if (spanish) setToLanguage(spanish.code);
     }
-  }, [languagesInitialized, supportedLanguages, user1Language, user2Language]);
+  }, [languagesInitialized, supportedLanguages, user1Language, user2Language, setFromLanguage, setToLanguage]);
 
   // Start new session when languages or voices change
   useEffect(() => {
@@ -107,9 +106,35 @@ function App() {
     }
   }, [user1Language, user2Language, user1Voice, user2Voice, isDatabaseConnected, apiKeysConfigured, startNewSession]);
 
+  // Check if the device is mobile
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkIfMobile();
+    window.addEventListener('resize', checkIfMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkIfMobile);
+    };
+  }, []);
+
   const handleStartRecording = async (speaker: 'user1' | 'user2') => {
     try {
       setCurrentSpeaker(speaker);
+      
+      // Update FSM languages based on current speaker
+      if (speaker === 'user1' && user1Language && user2Language) {
+        setFromLanguage(user1Language.code);
+        setToLanguage(user2Language.code);
+        if (user2Voice) setVoiceId(user2Voice.id);
+      } else if (speaker === 'user2' && user1Language && user2Language) {
+        setFromLanguage(user2Language.code);
+        setToLanguage(user1Language.code);
+        if (user1Voice) setVoiceId(user1Voice.id);
+      }
+      
       await startRecording();
     } catch (error) {
       setCurrentSpeaker(null);
@@ -120,51 +145,25 @@ function App() {
     if (!currentSpeaker || !user1Language || !user2Language) return;
 
     try {
-      const fromLang = currentSpeaker === 'user1' ? user1Language.name : user2Language.name;
-      const toLang = currentSpeaker === 'user1' ? user2Language.name : user1Language.name;
-
-      const result = await stopRecordingAndTranslate(fromLang, toLang);
-
-      if (currentSpeaker === 'user1') {
+      await stopRecordingAndTranslate();
+      
+      // Update UI state based on translation results
+      if (currentSpeaker === 'user1' && originalText && translatedText) {
         setTranslationState(prev => ({
           ...prev,
-          user1Text: result.original,
-          user1Translation: result.translated
+          user1Text: originalText,
+          user1Translation: translatedText
         }));
-        // Play translation for user 2 with user 2's selected voice
-        await playTranslation(result.translated, user2Voice.id);
         
-        // Save to database
-        if (currentSessionId) {
-          await saveTranslation(
-            'user_one',
-            result.original,
-            result.translated,
-            fromLang,
-            toLang,
-            user2Voice.id
-          );
-        }
-      } else {
+        // Database saving is handled in the FSM hook
+      } else if (currentSpeaker === 'user2' && originalText && translatedText) {
         setTranslationState(prev => ({
           ...prev,
-          user2Text: result.original,
-          user2Translation: result.translated
+          user2Text: originalText,
+          user2Translation: translatedText
         }));
-        // Play translation for user 1 with user 1's selected voice
-        await playTranslation(result.translated, user1Voice.id);
         
-        // Save to database
-        if (currentSessionId) {
-          await saveTranslation(
-            'user_two',
-            result.original,
-            result.translated,
-            fromLang,
-            toLang,
-            user1Voice.id
-          );
-        }
+        // Database saving is handled in the FSM hook
       }
     } catch (error) {
       console.error('Translation error:', error);
@@ -188,93 +187,16 @@ function App() {
       user1Translation: '',
       user2Translation: ''
     });
+    
+    // Update FSM languages
+    setFromLanguage(user2Language.code);
+    setToLanguage(user1Language.code);
   };
 
   const clearAllErrors = () => {
     clearTranslationError();
     clearDatabaseError();
   };
-
-  if (!apiKeysConfigured) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 text-center max-w-lg border border-white/20">
-          <div className="text-violet-500 mb-6">
-            <div className="w-16 h-16 bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <Brain className="w-8 h-8 text-white" />
-            </div>
-            <Key size={32} className="mx-auto" />
-          </div>
-          
-          <h2 className="text-2xl font-bold text-gray-800 mb-3">
-            <span className="bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
-              Brigitte AI
-            </span> Setup Required
-          </h2>
-          
-          <p className="text-gray-600 mb-6">
-            Please configure your API keys to enable intelligent translation services.
-          </p>
-          
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-            <h3 className="text-sm font-semibold text-red-800 mb-2">Missing API Keys:</h3>
-            <ul className="text-left text-sm text-red-700 space-y-1">
-              {missingKeys.map(key => (
-                <li key={key} className="flex items-center space-x-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{key}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <button
-            onClick={() => setShowApiKeyEditor(true)}
-            className="w-full px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-xl hover:from-violet-600 hover:to-purple-600 transition-all flex items-center justify-center space-x-2 shadow-lg mb-4"
-          >
-            <Edit3 className="w-4 h-4" />
-            <span>Configure API Keys</span>
-          </button>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-blue-800 mb-3">Get API Keys From:</h3>
-            <div className="text-left text-sm text-blue-700 space-y-2">
-              <div>• <strong>ElevenLabs:</strong> elevenlabs.io/api</div>
-              <div>• <strong>Google Gemini:</strong> makersuite.google.com/app/apikey</div>
-              <div>• <strong>DeepL:</strong> deepl.com/pro-api</div>
-            </div>
-          </div>
-
-          {showApiKeyEditor && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
-                <h3 className="text-lg font-bold mb-4">Configure API Keys</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Edit the file <code className="bg-gray-100 px-1 rounded">src/config/apiKeys.ts</code> and replace the placeholder values with your actual API keys.
-                </p>
-                <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                  <pre className="text-xs text-gray-700 whitespace-pre-wrap">
-{`export const API_KEYS = {
-  ELEVENLABS_API_KEY: 'sk_your_actual_key_here',
-  GEMINI_API_KEY: 'AIzaSy_your_actual_key_here',
-  DEEPL_API_KEY: 'your_actual_key_here',
-  // ... other keys
-};`}
-                  </pre>
-                </div>
-                <button
-                  onClick={() => setShowApiKeyEditor(false)}
-                  className="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   if (!languagesInitialized) {
     return (
@@ -288,8 +210,8 @@ function App() {
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Initializing Brigitte AI</h2>
           <p className="text-gray-600 mb-4">
-            Loading intelligent language processing from DeepL AI...
-          </p>
+                Loading intelligent language processing from Groq and DeepL AI...
+              </p>
           <LoadingSpinner size="lg" className="mx-auto text-violet-500" />
         </div>
       </div>
@@ -319,14 +241,14 @@ function App() {
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
                     Brigitte AI
                   </h1>
-                  <p className="text-sm text-gray-500">Powered by Google Gemini & DeepL</p>
+                  <p className="text-sm text-gray-500">Powered by Groq & DeepL</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                {/* Gemini Status Indicator */}
+                {/* Groq Status Indicator */}
                 <div className="flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs bg-blue-100 text-blue-700 border border-blue-200">
                   <Brain className="w-3 h-3" />
-                  <span>Gemini Active</span>
+                  <span>Groq Active</span>
                 </div>
                 {/* DeepL Status Indicator */}
                 <div className="flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs bg-emerald-100 text-emerald-700 border border-emerald-200">
@@ -345,6 +267,7 @@ function App() {
                 <button
                   onClick={() => setShowSettings(!showSettings)}
                   className="p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
+                  aria-label="Settings"
                 >
                   <Settings className="w-5 h-5 text-gray-600" />
                 </button>
@@ -451,9 +374,35 @@ function App() {
           </div>
         )}
 
+        {/* Mobile Menu */}
+        {isMobile && (
+          <MobileMenu
+            onLanguageSwap={swapLanguages}
+            onStartRecording={handleStartRecording}
+            onStopRecording={handleStopRecording}
+            currentSpeaker={currentSpeaker}
+            isProcessing={isProcessing}
+            isRecording={isRecording}
+            user1Language={user1Language}
+            user2Language={user2Language}
+          />
+        )}
+
         {/* Main Content */}
-        <main className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+        {!isMobile ? (
+          <DesktopLayout
+            onLanguageSwap={swapLanguages}
+            onStartRecording={handleStartRecording}
+            onStopRecording={handleStopRecording}
+            currentSpeaker={currentSpeaker}
+            isProcessing={isProcessing}
+            isRecording={isRecording}
+            user1Language={user1Language}
+            user2Language={user2Language}
+          />
+        ) : (
+          <main className={`container mx-auto px-4 py-8 ${isMobile ? 'pb-32' : ''}`}>
+            <div className={`grid grid-cols-1 ${isMobile ? '' : 'lg:grid-cols-2'} gap-8 max-w-6xl mx-auto`}>
             {/* User 1 Panel */}
             <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
               <div className="bg-gradient-to-r from-violet-500 to-violet-600 p-6 text-white">
@@ -576,39 +525,8 @@ function App() {
               </div>
             </div>
           </div>
-
-          {/* Status Indicator */}
-          <div className="text-center mt-8">
-            <div className={`inline-flex items-center space-x-2 px-6 py-3 rounded-full ${
-              isRecording
-                ? 'bg-green-100 text-green-800 border border-green-200'
-                : isProcessing
-                ? 'bg-violet-100 text-violet-800 border border-violet-200'
-                : 'bg-gray-100 text-gray-600 border border-gray-200'
-            }`}>
-              {isProcessing ? (
-                <LoadingSpinner size="sm" />
-              ) : (
-                <Volume2 className="w-4 h-4" />
-              )}
-              <span className="text-sm font-medium">
-                {isRecording
-                  ? `Recording ${currentSpeaker === 'user1' ? user1Language?.name : user2Language?.name}...`
-                  : isProcessing
-                  ? 'Processing with Brigitte AI...'
-                  : 'Tap microphone to start intelligent conversation'
-                }
-              </span>
-            </div>
-            
-            {/* Session Info */}
-            {currentSessionId && (
-              <div className="mt-3 text-xs text-gray-500">
-                Session: {currentSessionId.slice(0, 8)}... | {supportedLanguages.length} languages available via DeepL AI
-              </div>
-            )}
-          </div>
         </main>
+        )}
 
         {/* Footer */}
         <footer className="text-center py-8 text-gray-500">
@@ -618,7 +536,7 @@ function App() {
             </span> - Intelligent language barriers elimination
           </p>
           <p className="text-xs mt-1">
-            Powered by Google Gemini, DeepL AI, ElevenLabs & Neon Database
+            Powered by Groq, DeepL AI, ElevenLabs & Neon Database
           </p>
         </footer>
       </div>

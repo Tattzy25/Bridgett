@@ -1,12 +1,10 @@
-# 🤖 Brigitte AI - Intelligent Real-time Translation
+# 🤖 Bridgit AI - Intelligent Real-time Translation
 
-Break language barriers with Brigitte AI's intelligent real-time speech translation powered by Google Gemini, DeepL AI, and ElevenLabs.
+Break language barriers with Bridgit AI's intelligent real-time speech translation powered by Groq, DeepL AI, and ElevenLabs.
 
 ## 🚀 Quick Start
 
-### **IMPORTANT: Environment Setup Required Each Session**
-
-Due to WebContainer limitations, you'll need to set up your API keys each time you start working:
+### **Quick Setup**
 
 ```bash
 # Quick setup (recommended)
@@ -14,14 +12,13 @@ npm run quick-start
 
 # Or manual setup
 npm run setup-env
-# Then edit .env with your actual API keys
 npm run dev
 ```
 
 ### **Required API Keys**
 
 1. **ElevenLabs API Key** - Get from [elevenlabs.io/api](https://elevenlabs.io/api)
-2. **Google Gemini API Key** - Get from [makersuite.google.com/app/apikey](https://makersuite.google.com/app/apikey)
+2. **Groq API Key** - Get from [console.groq.com/keys](https://console.groq.com/keys)
 3. **DeepL API Key** - Get from [deepl.com/pro-api](https://deepl.com/pro-api)
 4. **Neon Database URL** (optional) - Get from [neon.tech](https://neon.tech)
 
@@ -35,7 +32,7 @@ npm run dev
 2. Edit the generated `.env` file with your actual API keys:
    ```env
    VITE_ELEVENLABS_API_KEY=sk_your_actual_elevenlabs_key
-   VITE_GEMINI_API_KEY=AIzaSy_your_actual_gemini_key
+   VITE_GROQ_API_KEY=gsk_your_actual_groq_key
    VITE_DEEPL_API_KEY=your_actual_deepl_key
    VITE_NEON_DATABASE_URL=postgresql://your_neon_url
    ```
@@ -47,13 +44,14 @@ npm run dev
 
 ## 🎯 Features
 
-- **Intelligent Speech Recognition** - Powered by Google Gemini
-- **Professional Translation** - DeepL AI for accurate translations
+- **Intelligent Speech Recognition** - Powered by Groq's Agentic Tooling
+- **Professional Translation** - DeepL AI for accurate translations with Groq as fallback
 - **Natural Voice Synthesis** - ElevenLabs for realistic speech output
 - **Real-time Conversation** - Seamless back-and-forth translation
 - **Multi-language Support** - 30+ languages supported
 - **Session Persistence** - Optional database storage with Neon
 - **Beautiful UI** - Modern, responsive design
+- **Finite State Machine Architecture** - Robust state management for the translation process
 
 ## 🔧 Troubleshooting
 
@@ -63,7 +61,7 @@ npm run dev
 - Restart the dev server after updating `.env`
 
 ### **"Failed to transcribe audio" Error**
-- Check your Gemini API key is valid
+- Check your Groq API key is valid
 - Ensure microphone permissions are granted
 - Try speaking more clearly and for longer
 
@@ -83,9 +81,10 @@ npm run dev
 ## 🛠 Technology Stack
 
 - **Frontend**: React + TypeScript + Tailwind CSS
-- **Speech-to-Text**: Google Gemini AI
-- **Translation**: DeepL AI API
+- **Speech-to-Text**: Groq AI with Agentic Tooling
+- **Translation**: DeepL AI API with Groq as fallback
 - **Text-to-Speech**: ElevenLabs API
+- **State Management**: Finite State Machine Architecture
 - **Database**: Neon PostgreSQL (optional)
 - **Build Tool**: Vite
 
