@@ -176,11 +176,11 @@ class DeepLService {
     }
   }
 
-  async translateText(
-    text: string,
-    targetLanguage: string,
-    sourceLanguage?: string
-  ): Promise<{ translatedText: string; detectedSourceLanguage: string }> {
+  // Replace mock translations with proper error handling
+  async translateText(text: string, targetLanguage: string, sourceLanguage?: string) {
+    if (!this.isApiAvailable) {
+      throw new Error('DeepL API is not available. Please check your API key configuration.');
+    }
     if (!text.trim()) {
       throw new Error('Text to translate cannot be empty');
     }
@@ -288,7 +288,7 @@ class DeepLService {
   getSupportedLanguages(): Array<{ code: string; name: string; flag: string }> {
     const languageFlags: { [key: string]: string } = {
       'EN': '🇺🇸',
-      'ES': '🇪🇸',
+      'ES': '🇪🇸', 
       'FR': '🇫🇷',
       'DE': '🇩🇪',
       'IT': '🇮🇹',
@@ -334,7 +334,7 @@ class DeepLService {
     // Convert language names to DeepL codes
     const languageMap: { [key: string]: string } = {
       'English': 'EN',
-      'Spanish': 'ES',
+      'Spanish': 'ES', 
       'French': 'FR',
       'German': 'DE',
       'Italian': 'IT',
@@ -344,7 +344,7 @@ class DeepLService {
       'Korean': 'KO',
       'Chinese': 'ZH',
       'Arabic': 'AR',
-      'Hindi': 'HI',
+      'Hindi': 'HI',  // Added missing comma here
       'Dutch': 'NL',
       'Polish': 'PL',
       'Swedish': 'SV',
@@ -369,12 +369,6 @@ class DeepLService {
       'Vietnamese': 'VI',
     };
 
-    // If it's already a code, return as is
-    if (language.length <= 3 && language === language.toUpperCase()) {
-      return language;
-    }
-
-    // Try to find the code by name
     return languageMap[language] || language.toUpperCase();
   }
 

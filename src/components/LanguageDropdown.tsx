@@ -30,10 +30,9 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
   'aria-label': ariaLabel
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Validate props
   useEffect(() => {
@@ -56,30 +55,17 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
     return languages.find(lang => lang.code === selectedLanguage) || null;
   }, [languages, selectedLanguage]);
 
-  // Filter languages based on search term
-  const filteredLanguages = useMemo(() => {
-    if (!searchTerm.trim()) return languages;
-    
-    const term = searchTerm.toLowerCase().trim();
-    return languages.filter(lang => 
-      lang.name.toLowerCase().includes(term) ||
-      lang.code.toLowerCase().includes(term)
-    );
-  }, [languages, searchTerm]);
-
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        setSearchTerm('');
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsOpen(false);
-        setSearchTerm('');
         buttonRef.current?.focus();
       }
     };
@@ -95,20 +81,10 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
     };
   }, [isOpen]);
 
-  // Focus search input when dropdown opens
-  useEffect(() => {
-    if (isOpen && searchInputRef.current) {
-      setTimeout(() => searchInputRef.current?.focus(), 100);
-    }
-  }, [isOpen]);
-
   const handleToggleDropdown = useCallback(() => {
     if (disabled) return;
     setIsOpen(prev => !prev);
-    if (!isOpen) {
-      setSearchTerm('');
-    }
-  }, [disabled, isOpen]);
+  }, [disabled]);
 
   const handleLanguageSelect = useCallback((languageCode: string) => {
     if (disabled) return;
@@ -116,7 +92,6 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
     try {
       onLanguageChange(languageCode);
       setIsOpen(false);
-      setSearchTerm('');
       buttonRef.current?.focus();
     } catch (error) {
       const errorMessage = `Failed to select language: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -145,11 +120,62 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
       case 'ArrowUp':
         if (isOpen) {
           event.preventDefault();
-          // Focus previous item logic could be added here
         }
         break;
     }
   }, [handleLanguageSelect, handleToggleDropdown, isOpen]);
+
+  // Function to get flag image URL with proper country code mapping
+  const getFlagUrl = (languageCode: string) => {
+    // Map language codes to proper country codes for flags
+    const countryCodeMap: { [key: string]: string } = {
+      'EN': 'us', // English -> United States flag
+      'ES': 'es', // Spanish -> Spain
+      'FR': 'fr', // French -> France
+      'DE': 'de', // German -> Germany
+      'IT': 'it', // Italian -> Italy
+      'PT': 'br', // Portuguese -> Brazil
+      'RU': 'ru', // Russian -> Russia
+      'JA': 'jp', // Japanese -> Japan
+      'KO': 'kr', // Korean -> South Korea
+      'ZH': 'cn', // Chinese -> China
+      'AR': 'sa', // Arabic -> Saudi Arabia
+      'HI': 'in', // Hindi -> India
+      'NL': 'nl', // Dutch -> Netherlands
+      'PL': 'pl', // Polish -> Poland
+      'SV': 'se', // Swedish -> Sweden
+      'DA': 'dk', // Danish -> Denmark
+      'FI': 'fi', // Finnish -> Finland
+      'NO': 'no', // Norwegian -> Norway
+      'CS': 'cz', // Czech -> Czech Republic
+      'HU': 'hu', // Hungarian -> Hungary
+      'RO': 'ro', // Romanian -> Romania
+      'SK': 'sk', // Slovak -> Slovakia
+      'SL': 'si', // Slovenian -> Slovenia
+      'BG': 'bg', // Bulgarian -> Bulgaria
+      'ET': 'ee', // Estonian -> Estonia
+      'LV': 'lv', // Latvian -> Latvia
+      'LT': 'lt', // Lithuanian -> Lithuania
+      'UK': 'ua', // Ukrainian -> Ukraine
+      'TR': 'tr', // Turkish -> Turkey
+      'EL': 'gr', // Greek -> Greece
+      'ID': 'id', // Indonesian -> Indonesia
+      'MS': 'my', // Malay -> Malaysia
+      'TH': 'th', // Thai -> Thailand
+      'VI': 'vn', // Vietnamese -> Vietnam
+    };
+    
+    const countryCode = countryCodeMap[languageCode.toUpperCase()] || languageCode.toLowerCase();
+    return `https://flagcdn.com/w40/${countryCode}.png`;
+  };
+
+  const handleImageError = useCallback((languageCode: string) => {
+    setFailedImages(prev => new Set(prev).add(languageCode));
+  }, []);
+
+  const shouldShowImage = useCallback((languageCode: string) => {
+    return !failedImages.has(languageCode);
+  }, [failedImages]);
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
@@ -166,7 +192,7 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
           disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
         }`}
         style={{
-          borderRadius: '20px',
+          borderRadius: '8px',
           background: disabled ? '#f0f0f0' : '#e0e0e0',
           boxShadow: isOpen 
             ? 'inset 6px 6px 12px #bebebe, inset -6px -6px 12px #ffffff'
@@ -179,9 +205,18 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
       >
         {selectedLang ? (
           <>
-            <span className="text-2xl mb-1" role="img" aria-label={`${selectedLang.name} flag`}>
-              {selectedLang.flag}
-            </span>
+            {shouldShowImage(selectedLang.code) ? (
+              <img 
+                src={getFlagUrl(selectedLang.code)} 
+                alt={`${selectedLang.name} flag`}
+                className="w-8 h-6 mb-1 object-cover rounded-sm"
+                onError={() => handleImageError(selectedLang.code)}
+              />
+            ) : (
+              <span className="text-2xl mb-1" role="img" aria-label={`${selectedLang.name} flag`}>
+                {selectedLang.flag}
+              </span>
+            )}
             <span className="text-xs font-medium text-center leading-tight">
               {selectedLang.code}
             </span>
@@ -201,66 +236,56 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
           aria-label="Language options"
           className="absolute top-full left-0 right-0 mt-2 z-50 max-h-60 overflow-hidden"
           style={{
-            borderRadius: '15px',
+            borderRadius: '8px',
             background: '#e0e0e0',
             boxShadow: '10px 10px 20px #bebebe, -10px -10px 20px #ffffff',
             border: '1px solid rgba(255, 255, 255, 0.3)'
           }}
         >
-          {/* Search Input */}
-          <div className="p-2 border-b border-gray-300">
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search languages..."
-              className="w-full px-3 py-2 text-sm bg-white rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              aria-label="Search languages"
-            />
-          </div>
-
-          {/* Language List - Hidden Scrollbar */}
+          {/* Language List - No search field */}
           <div 
             className="max-h-48 overflow-y-auto"
             style={{
-              scrollbarWidth: 'none', /* Firefox */
-              msOverflowStyle: 'none', /* Internet Explorer 10+ */
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
             }}
           >
             <style jsx>{`
               div::-webkit-scrollbar {
-                display: none; /* Safari and Chrome */
+                display: none;
               }
             `}</style>
-            {filteredLanguages.length > 0 ? (
-              filteredLanguages.map((language, index) => (
-                <button
-                  key={language.code}
-                  onClick={() => handleLanguageSelect(language.code)}
-                  onKeyDown={(e) => handleKeyDown(e, language.code)}
-                  role="option"
-                  aria-selected={selectedLanguage === language.code}
-                  className="w-full px-3 py-3 text-left text-xs sm:text-sm hover:bg-gray-100 focus:bg-gray-100 focus:outline-none transition-colors flex items-center gap-3"
-                  style={{
-                    color: '#666',
-                    background: selectedLanguage === language.code ? 'rgba(255, 255, 255, 0.5)' : 'transparent'
-                  }}
-                >
+            {languages.map((language, index) => (
+              <button
+                key={language.code}
+                onClick={() => handleLanguageSelect(language.code)}
+                onKeyDown={(e) => handleKeyDown(e, language.code)}
+                role="option"
+                aria-selected={selectedLanguage === language.code}
+                className="w-full px-3 py-3 text-left text-xs sm:text-sm hover:bg-gray-100 focus:bg-gray-100 focus:outline-none transition-colors flex items-center gap-3"
+                style={{
+                  color: '#666',
+                  background: selectedLanguage === language.code ? 'rgba(255, 255, 255, 0.5)' : 'transparent'
+                }}
+              >
+                {shouldShowImage(language.code) ? (
+                  <img 
+                    src={getFlagUrl(language.code)} 
+                    alt={`${language.name} flag`}
+                    className="w-8 h-6 object-cover rounded-sm"
+                    onError={() => handleImageError(language.code)}
+                  />
+                ) : (
                   <span className="text-2xl" role="img" aria-label={`${language.name} flag`}>
                     {language.flag}
                   </span>
-                  <span className="font-medium text-lg">{language.code}</span>
-                  {selectedLanguage === language.code && (
-                    <span className="ml-auto text-blue-500" aria-hidden="true">✓</span>
-                  )}
-                </button>
-              ))
-            ) : (
-              <div className="px-3 py-3 text-center text-gray-500 text-sm">
-                No languages found
-              </div>
-            )}
+                )}
+                <span className="font-medium text-lg">{language.code}</span>
+                {selectedLanguage === language.code && (
+                  <span className="ml-auto text-blue-500" aria-hidden="true">✓</span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       )}

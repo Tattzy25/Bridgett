@@ -21,26 +21,21 @@ function App() {
           />
         </div>
         
-        {/* Central Logo Overlay - Responsive positioning */}
+        {/* Central Logo */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div 
             className="rounded-2xl sm:rounded-3xl flex items-center justify-center"
             style={{
-              width: '120px',
-              height: '120px',
+              width: '80px',
+              height: '80px',
               background: '#e0e0e0',
-              boxShadow: '8px 8px 16px #bebebe, -8px -8px 16px #ffffff',
-              border: '2px solid rgba(255, 255, 255, 0.3)'
+              boxShadow: '20px 20px 60px #bebebe, -20px -20px 60px #ffffff'
             }}
           >
             <img 
               src={logoImage} 
               alt="Bridgit AI Logo" 
-              className="object-contain"
-              style={{
-                width: '90px',
-                height: '90px'
-              }}
+              className="w-12 h-12 object-contain"
             />
           </div>
         </div>

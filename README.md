@@ -1,6 +1,6 @@
 # 🤖 Bridgit AI - Intelligent Real-time Translation
 
-Break language barriers with Bridgit AI's intelligent real-time speech translation powered by Groq, DeepL AI, and ElevenLabs.
+Break language barriers with Bridgit AI's intelligent real-time speech translation powered by Gemini, Groq, DeepL AI, and ElevenLabs with production-ready fallback systems.
 
 ## 🚀 Quick Start
 

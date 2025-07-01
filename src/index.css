@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Fix for mobile viewport */
+@media (max-width: 640px) {
+  .translation-card {
+    max-width: 90vw !important;
+    margin: 0 auto;
+  }
+}
+
+/* Prevent content overflow */
+.neumorphic-content {
+  overflow: hidden;
+  word-wrap: break-word;
+}
+
+/* Ensure proper spacing */
+.translation-layout {
+  gap: clamp(1rem, 4vw, 2rem);
+}

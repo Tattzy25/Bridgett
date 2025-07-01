@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import NeumorphicCard from './NeumorphicCard';
 import LanguageSelector from './LanguageSelector';
 import InputField from './InputField';
 import MicrophoneButton from './MicrophoneButton';
-import { useCardLanguageState } from '../hooks/useCardLanguageState'; // Updated import
+import { useCardLanguageState } from '../hooks/useCardLanguageState';
+import { useFSMTranslation } from '../hooks/useFSMTranslation';
+import { TranslationState } from '../services/fsmOrchestrator';
 
 interface TranslationCardProps {
   cardId: string;
@@ -12,8 +14,6 @@ interface TranslationCardProps {
 
 const TranslationCard: React.FC<TranslationCardProps> = ({ cardId, className }) => {
   const [inputText, setInputText] = useState('');
-  const [outputText, setOutputText] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
   
   const {
     fromLanguage,
@@ -21,56 +21,129 @@ const TranslationCard: React.FC<TranslationCardProps> = ({ cardId, className }) 
     setFromLanguage,
     setToLanguage,
     swapLanguages
-  } = useCardLanguageState(cardId); // Updated hook usage
+  } = useCardLanguageState(cardId);
 
-  const handleStartRecording = () => {
-    setIsRecording(true);
-    // TODO: Implement actual recording logic
+  // Use FSM Translation hook for real functionality
+  const {
+    state,
+    isRecording,
+    isProcessing,
+    error,
+    originalText,
+    translatedText,
+    detectedLanguage,
+    startRecording,
+    stopRecordingAndTranslate,
+    clearError,
+    setFromLanguage: setFSMFromLanguage,
+    setToLanguage: setFSMToLanguage
+  } = useFSMTranslation();
+
+  // Sync language changes with FSM
+  useEffect(() => {
+    setFSMFromLanguage(fromLanguage);
+  }, [fromLanguage, setFSMFromLanguage]);
+
+  useEffect(() => {
+    setFSMToLanguage(toLanguage);
+  }, [toLanguage, setFSMToLanguage]);
+
+  // Update display text based on FSM state
+  useEffect(() => {
+    if (originalText && state !== TranslationState.IDLE) {
+      setInputText(originalText);
+    }
+  }, [originalText, state]);
+
+  // Clear error when component unmounts or resets
+  useEffect(() => {
+    return () => {
+      if (error) {
+        clearError();
+      }
+    };
+  }, [error, clearError]);
+
+  const handleStartRecording = async () => {
+    try {
+      clearError();
+      await startRecording();
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+    }
   };
 
-  const handleStopRecording = () => {
-    setIsRecording(false);
-    // TODO: Implement stop recording and transcription logic
+  const handleStopRecording = async () => {
+    try {
+      await stopRecordingAndTranslate();
+    } catch (error) {
+      console.error('Failed to stop recording and translate:', error);
+    }
+  };
+
+  const handleInputChange = (text: string) => {
+    setInputText(text);
+  };
+
+  const getStatusText = () => {
+    if (error) return `Error: ${error.message}`;
+    if (detectedLanguage && state !== TranslationState.IDLE) {
+      return `Detected: ${detectedLanguage}`;
+    }
+    switch (state) {
+      case TranslationState.RECORDING: return 'Listening...';
+      case TranslationState.TRANSCRIBING: return 'Processing...';
+      case TranslationState.TRANSLATING: return 'Translating...';
+      case TranslationState.SPEAKING: return 'Speaking...';
+      default: return translatedText || 'Translation will appear here';
+    }
   };
 
   return (
-    <NeumorphicCard 
-      width="100%" 
-      height="auto"
-      className={className}
-    >
-      <div className="flex flex-col items-center justify-between h-full w-full p-4 sm:p-6 min-h-[400px] sm:min-h-[500px]">
-        <LanguageSelector
-          fromLanguage={fromLanguage}
-          toLanguage={toLanguage}
-          onFromLanguageChange={setFromLanguage}
-          onToLanguageChange={setToLanguage}
-          onSwapLanguages={swapLanguages}
-          cardId={cardId}
-        />
-        
-        <InputField
-          value={inputText}
-          onChange={setInputText}
-          placeholder="Enter text to translate"
-          size="large"
-          className="mb-4 sm:mb-5"
-        />
-        
-        <InputField
-          value={outputText}
-          onChange={setOutputText}
-          placeholder="Translation will appear here"
-          size="small"
-          className="w-3/5 mb-6 sm:mb-10 self-start"
-        />
-        
-        <MicrophoneButton
-          onStartRecording={handleStartRecording}
-          onStopRecording={handleStopRecording}
-          isRecording={isRecording}
-        />
+    <NeumorphicCard className={className}>
+      {/* Language Selector */}
+      <LanguageSelector
+        fromLanguage={fromLanguage}
+        toLanguage={toLanguage}
+        onFromLanguageChange={setFromLanguage}
+        onToLanguageChange={setToLanguage}
+        onSwapLanguages={swapLanguages}
+        cardId={cardId}
+      />
+      
+      {/* Input Field */}
+      <InputField
+        value={inputText}
+        onChange={handleInputChange}
+        placeholder="Enter text to translate"
+        size="large"
+        className="mb-4"
+      />
+      
+      {/* Status Indicator - Smaller and centered */}
+      <div 
+        className="mx-auto mb-4 px-4 py-2 text-sm text-center flex items-center justify-center"
+        style={{
+          width: '80%',
+          height: '40px',
+          borderRadius: '8px', // Square corners
+          background: '#e0e0e0',
+          boxShadow: 'inset 3px 3px 6px #bebebe, inset -3px -3px 6px #ffffff',
+          color: error ? '#ef4444' : '#666',
+          fontSize: '12px',
+          fontWeight: '500'
+        }}
+      >
+        {getStatusText()}
       </div>
+      
+      {/* Microphone Button - Below status indicator */}
+      <MicrophoneButton
+        isRecording={isRecording}
+        onStartRecording={handleStartRecording}
+        onStopRecording={handleStopRecording}
+        disabled={isProcessing}
+      />
     </NeumorphicCard>
   );
 };
