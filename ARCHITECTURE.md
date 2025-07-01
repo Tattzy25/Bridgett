@@ -43,7 +43,6 @@ IDLE → RECORDING → TRANSCRIBING → TRANSLATING → SPEAKING → IDLE
 **Implementation:**
 - Services initialize without API validation
 - Error handling occurs during actual API calls
-- Fallback mechanisms activate automatically when APIs are unavailable
 
 ### 4. Service Coordination
 
@@ -80,7 +79,6 @@ IDLE → RECORDING → TRANSCRIBING → TRANSLATING → SPEAKING → IDLE
 
 ### DO Implement:
 - Error handling at the point of API usage
-- Graceful fallbacks when services are unavailable
 - User-friendly error messages
 - Lazy loading of API-dependent features
 
@@ -91,8 +89,7 @@ IDLE → RECORDING → TRANSCRIBING → TRANSLATING → SPEAKING → IDLE
 1. **Create the service class** without startup API tests
 2. **Integrate with FSM Orchestrator** for state management
 3. **Implement error handling** at the method level
-4. **Add fallback mechanisms** where appropriate
-5. **Update the orchestrator** to coordinate the new service
+4. **Update the orchestrator** to coordinate the new service
 
 ### Error Handling Pattern
 

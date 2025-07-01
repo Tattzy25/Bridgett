@@ -110,11 +110,82 @@ class NeonService {
         $$ LANGUAGE plpgsql;
       `;
 
+      // Drop and recreate trigger safely
+      try {
+        await this.sql`
+          DROP TRIGGER IF EXISTS trigger_update_translation_count ON voice_bridge_translations
+        `;
+      } catch (dropError: any) {
+        // Ignore drop errors as trigger might not exist
+        console.log('Trigger drop info:', dropError.message);
+      }
+      
+      try {
+        await this.sql`
+          CREATE TRIGGER trigger_update_translation_count
+          AFTER INSERT ON voice_bridge_translations
+          FOR EACH ROW EXECUTE FUNCTION update_session_translation_count()
+        `;
+      } catch (createError: any) {
+        // Check if trigger already exists, if so, continue
+        if (!createError.message.includes('already exists')) {
+          throw createError;
+        }
+        console.log('Trigger already exists, continuing...');
+      }
+
+      // Create user_language_preferences table with full production constraints
       await this.sql`
-        DROP TRIGGER IF EXISTS trigger_update_translation_count ON voice_bridge_translations;
-        CREATE TRIGGER trigger_update_translation_count
-        AFTER INSERT ON voice_bridge_translations
-        FOR EACH ROW EXECUTE FUNCTION update_session_translation_count();
+        CREATE TABLE IF NOT EXISTS user_language_preferences (
+          preference_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_identifier VARCHAR(100) NOT NULL,
+          from_language VARCHAR(10) NOT NULL CHECK (length(from_language) >= 2),
+          to_language VARCHAR(10) NOT NULL CHECK (length(to_language) >= 2),
+          voice_preference VARCHAR(100) NOT NULL,
+          is_default BOOLEAN DEFAULT false,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          CONSTRAINT unique_user_lang_pair UNIQUE(user_identifier, from_language, to_language),
+          CONSTRAINT different_languages CHECK (from_language != to_language)
+        )
+      `;
+
+      // Create optimized indexes for real-world performance
+      await this.sql`
+        CREATE INDEX IF NOT EXISTS idx_user_language_preferences_user_lookup 
+        ON user_language_preferences(user_identifier)
+      `;
+
+      await this.sql`
+        CREATE INDEX IF NOT EXISTS idx_user_language_preferences_default 
+        ON user_language_preferences(user_identifier, is_default) WHERE is_default = true
+      `;
+
+      // Create trigger to ensure only one default per user
+      await this.sql`
+        CREATE OR REPLACE FUNCTION ensure_single_default_preference()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          IF NEW.is_default = true THEN
+            UPDATE user_language_preferences 
+            SET is_default = false, updated_at = NOW()
+            WHERE user_identifier = NEW.user_identifier 
+              AND preference_id != NEW.preference_id
+              AND is_default = true;
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `;
+
+      await this.sql`
+        DROP TRIGGER IF EXISTS trigger_ensure_single_default ON user_language_preferences
+      `;
+
+      await this.sql`
+        CREATE TRIGGER trigger_ensure_single_default
+        BEFORE INSERT OR UPDATE ON user_language_preferences
+        FOR EACH ROW EXECUTE FUNCTION ensure_single_default_preference()
       `;
 
     } catch (error) {
@@ -141,7 +212,7 @@ class NeonService {
         RETURNING session_id
       `;
 
-      return result[0].session_id;
+      return (result as any[])[0].session_id;
     } catch (error) {
       console.error('Error creating Voice Bridge session:', error);
       throw new Error('Failed to create translation session');
@@ -281,7 +352,7 @@ class NeonService {
         WHERE voice_bridge_session_id = ${sessionId}
       `;
 
-      const result = stats[0];
+      const result = (stats as any[])[0];
 
       return {
         totalTranslations: parseInt(result.total_translations),
@@ -293,6 +364,137 @@ class NeonService {
     } catch (error) {
       console.error('Error fetching Voice Bridge session statistics:', error);
       throw new Error('Failed to fetch conversation statistics');
+    }
+  }
+
+  async saveUserLanguagePreference(
+    userIdentifier: string,
+    fromLanguage: string,
+    toLanguage: string,
+    voicePreference: string,
+    isDefault: boolean = false
+  ): Promise<string> {
+    // Input validation
+    if (!userIdentifier?.trim()) {
+      throw new Error('User identifier is required');
+    }
+    if (!fromLanguage?.trim() || fromLanguage.length < 2) {
+      throw new Error('Valid from language code is required (min 2 characters)');
+    }
+    if (!toLanguage?.trim() || toLanguage.length < 2) {
+      throw new Error('Valid to language code is required (min 2 characters)');
+    }
+    if (fromLanguage === toLanguage) {
+      throw new Error('From and to languages must be different');
+    }
+    if (!voicePreference?.trim()) {
+      throw new Error('Voice preference is required');
+    }
+
+    try {
+      const result = await this.sql`
+        INSERT INTO user_language_preferences (
+          user_identifier,
+          from_language,
+          to_language,
+          voice_preference,
+          is_default
+        )
+        VALUES (
+          ${userIdentifier.trim()},
+          ${fromLanguage.toUpperCase().trim()},
+          ${toLanguage.toUpperCase().trim()},
+          ${voicePreference.trim()},
+          ${isDefault}
+        )
+        ON CONFLICT (user_identifier, from_language, to_language)
+        DO UPDATE SET
+          voice_preference = EXCLUDED.voice_preference,
+          is_default = EXCLUDED.is_default,
+          updated_at = NOW()
+        RETURNING preference_id
+      `;
+
+      return result[0].preference_id;
+    } catch (error) {
+      console.error('Error saving user language preference:', error);
+      throw new Error(`Failed to save language preference: ${error instanceof Error ? error.message : 'Database error'}`);
+    }
+  }
+
+  async getUserLanguagePreferences(userIdentifier: string): Promise<UserLanguagePreference[]> {
+    if (!userIdentifier?.trim()) {
+      throw new Error('User identifier is required');
+    }
+
+    try {
+      const preferences = await this.sql`
+        SELECT 
+          preference_id,
+          user_identifier,
+          from_language,
+          to_language,
+          voice_preference,
+          is_default,
+          created_at,
+          updated_at
+        FROM user_language_preferences 
+        WHERE user_identifier = ${userIdentifier.trim()}
+        ORDER BY is_default DESC, updated_at DESC
+      `;
+
+      return preferences as UserLanguagePreference[];
+    } catch (error) {
+      console.error('Error fetching user language preferences:', error);
+      throw new Error(`Failed to fetch language preferences: ${error instanceof Error ? error.message : 'Database error'}`);
+    }
+  }
+
+  async getDefaultLanguagePreference(userIdentifier: string): Promise<UserLanguagePreference | null> {
+    if (!userIdentifier?.trim()) {
+      throw new Error('User identifier is required');
+    }
+
+    try {
+      const result = await this.sql`
+        SELECT 
+          preference_id,
+          user_identifier,
+          from_language,
+          to_language,
+          voice_preference,
+          is_default,
+          created_at,
+          updated_at
+        FROM user_language_preferences 
+        WHERE user_identifier = ${userIdentifier.trim()} AND is_default = true
+        LIMIT 1
+      `;
+
+      return result.length > 0 ? result[0] as UserLanguagePreference : null;
+    } catch (error) {
+      console.error('Error fetching default language preference:', error);
+      throw new Error(`Failed to fetch default language preference: ${error instanceof Error ? error.message : 'Database error'}`);
+    }
+  }
+
+  async deleteUserLanguagePreference(preferenceId: string): Promise<void> {
+    if (!preferenceId?.trim()) {
+      throw new Error('Preference ID is required');
+    }
+
+    try {
+      const result = await this.sql`
+        DELETE FROM user_language_preferences 
+        WHERE preference_id = ${preferenceId.trim()}
+      `;
+
+      if (result.count === 0) {
+        throw new Error('Language preference not found');
+      }
+    } catch (error) {
+      console.error('Error deleting user language preference:', error);
+      throw new Error(`Failed to delete language preference: ${error instanceof Error ? error.message : 'Database error'}`);
     }
   }
 }

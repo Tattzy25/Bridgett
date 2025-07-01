@@ -47,7 +47,8 @@ export const validateApiKeys = (): { valid: boolean; missing: string[] } => {
   const requiredKeys: ApiKeyType[] = [
     'ELEVENLABS_API_KEY',
     'GROQ_API_KEY', 
-    'DEEPL_API_KEY'
+    'DEEPL_API_KEY',
+    'NEON_DATABASE_URL'
   ];
   
   const missing: string[] = [];

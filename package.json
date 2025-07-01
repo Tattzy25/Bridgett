@@ -15,7 +15,9 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
+    "country-flag-icons": "^1.5.19",
     "eiows": "^8.2.0",
+    "iso-639-1": "^3.1.5",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

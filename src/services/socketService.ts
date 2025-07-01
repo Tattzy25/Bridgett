@@ -14,7 +14,10 @@ class SocketService {
   private connected: boolean = false;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
-  private serverUrl: string = '';
+
+
+
+
   private currentSessionId: string | null = null;
   
   // Private constructor for singleton pattern
@@ -42,7 +45,6 @@ class SocketService {
       return;
     }
     
-    this.serverUrl = serverUrl;
     this.logger.info(`Initializing socket connection to ${serverUrl}`);
     
     // Create socket connection

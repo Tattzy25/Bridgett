@@ -63,6 +63,7 @@ export class FSMOrchestrator {
 
   constructor(fromLanguage: string, toLanguage: string, voiceId?: string) {
     this.context = {
+      speaker: '',
       fromLanguage,
       toLanguage,
       voiceId
