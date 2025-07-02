@@ -119,7 +119,13 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
   if (!languages.length) {
     return (
       <div className={`${className} opacity-50`}>
-        <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-[20px] p-4 text-center text-gray-500">
+        <div 
+          className="p-4 text-center text-gray-500 rounded-[20px]"
+          style={{
+            background: '#e0e0e0',
+            boxShadow: 'inset 8px 8px 16px #bebebe, inset -8px -8px 16px #ffffff'
+          }}
+        >
           No languages available
         </div>
       </div>
@@ -132,17 +138,36 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
         ref={buttonRef}
         type="button"
         className={`
-          w-full bg-white/20 backdrop-blur-sm border border-white/30 rounded-[20px] p-4
-          flex items-center justify-center gap-2 transition-all duration-200
-          hover:bg-white/30 hover:border-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50
+          w-full p-4 rounded-[20px] flex items-center justify-center gap-2 transition-all duration-200
+          hover:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-blue-500/50
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-          ${isOpen ? 'bg-white/30 border-white/50' : ''}
         `}
+        style={{
+          background: '#e0e0e0',
+          boxShadow: isOpen 
+            ? 'inset 8px 8px 16px #bebebe, inset -8px -8px 16px #ffffff'
+            : '8px 8px 16px #bebebe, -8px -8px 16px #ffffff'
+        }}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
         aria-label={ariaLabel}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
+        onMouseDown={(e) => {
+          if (!disabled) {
+            e.currentTarget.style.boxShadow = 'inset 8px 8px 16px #bebebe, inset -8px -8px 16px #ffffff';
+          }
+        }}
+        onMouseUp={(e) => {
+          if (!disabled && !isOpen) {
+            e.currentTarget.style.boxShadow = '8px 8px 16px #bebebe, -8px -8px 16px #ffffff';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!disabled && !isOpen) {
+            e.currentTarget.style.boxShadow = '8px 8px 16px #bebebe, -8px -8px 16px #ffffff';
+          }
+        }}
       >
         {selectedLanguageData ? (
           <>
@@ -168,7 +193,13 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 backdrop-blur-sm border border-white/30 rounded-[20px] shadow-lg z-50 max-h-60 overflow-y-auto">
+        <div 
+          className="absolute top-full left-0 right-0 mt-2 rounded-[20px] shadow-lg z-50 max-h-60 overflow-y-auto scrollbar-hidden"
+          style={{
+            background: '#e0e0e0',
+            boxShadow: '8px 8px 16px #bebebe, -8px -8px 16px #ffffff'
+          }}
+        >
           <div className="p-2" role="listbox" aria-label="Language options">
             {languages.map((language) => (
               <button
@@ -176,12 +207,31 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({
                 type="button"
                 className={`
                   w-full flex items-center gap-3 p-3 rounded-[15px] transition-all duration-150
-                  hover:bg-blue-50 focus:outline-none focus:bg-blue-50
-                  ${selectedLanguage === language.code ? 'bg-blue-100 text-blue-700' : 'text-gray-700'}
+                  hover:scale-[0.98] focus:outline-none
+                  ${selectedLanguage === language.code ? 'text-blue-700' : 'text-gray-700'}
                 `}
+                style={{
+                  background: selectedLanguage === language.code ? '#d1d5db' : 'transparent',
+                  boxShadow: selectedLanguage === language.code 
+                    ? 'inset 4px 4px 8px #bebebe, inset -4px -4px 8px #ffffff'
+                    : 'none'
+                }}
                 onClick={() => handleLanguageSelect(language.code)}
                 role="option"
                 aria-selected={selectedLanguage === language.code}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.boxShadow = 'inset 4px 4px 8px #bebebe, inset -4px -4px 8px #ffffff';
+                }}
+                onMouseUp={(e) => {
+                  if (selectedLanguage !== language.code) {
+                    e.currentTarget.style.boxShadow = 'none';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedLanguage !== language.code) {
+                    e.currentTarget.style.boxShadow = 'none';
+                  }
+                }}
               >
                 {renderFlag(language)}
                 <span className="text-sm font-medium truncate">{language.name}</span>

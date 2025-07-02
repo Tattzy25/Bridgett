@@ -1,9 +1,21 @@
-// Remove unused React import if using React 17+
-// import React from 'react'; // Remove this line
+// Remove unused React import since you're using React 17+ JSX transform
+import { useState } from 'react';
 import TranslationCard from './components/TranslationCard';
+import SettingsMenu from './components/SettingsMenu';
 import logoImage from './components/bridgit ai logo.png';
 
 function App() {
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const handleSettingsToggle = () => {
+    setIsSettingsOpen(!isSettingsOpen);
+  };
+
+  const handleVoiceSettings = () => {
+    console.log('Voice settings triggered');
+    setIsSettingsOpen(false);
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#e0e0e0' }}>
       <div className="flex items-center justify-center min-h-screen relative px-4 py-8">
@@ -22,25 +34,36 @@ function App() {
           />
         </div>
         
-        {/* Central Logo */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div 
-            className="rounded-2xl sm:rounded-3xl flex items-center justify-center"
+        {/* Central Logo - Clickable Menu Button */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+          <button
+            onClick={handleSettingsToggle}
+            className="rounded-2xl sm:rounded-3xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 pointer-events-auto"
             style={{
               width: '80px',
               height: '80px',
               background: '#e0e0e0',
-              boxShadow: '20px 20px 60px #bebebe, -20px -20px 60px #ffffff'
+              boxShadow: isSettingsOpen 
+                ? 'inset 8px 8px 16px #bebebe, inset -8px -8px 16px #ffffff'
+                : '20px 20px 60px #bebebe, -20px -20px 60px #ffffff'
             }}
+            aria-label="Open settings menu"
           >
             <img 
               src={logoImage} 
               alt="Bridgit AI Logo" 
               className="w-12 h-12 object-contain"
             />
-          </div>
+          </button>
         </div>
       </div>
+
+      {/* Settings Menu */}
+      <SettingsMenu
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onVoiceSettings={handleVoiceSettings}
+      />
     </div>
   );
 }

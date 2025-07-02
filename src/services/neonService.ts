@@ -36,162 +36,16 @@ class NeonService {
     this.sql = neon(databaseUrl);
   }
 
+  // Add a singleton pattern or initialization lock to prevent concurrent updates
+  private static initializationPromise: Promise<void> | null = null;
+  
   async initializeDatabase(): Promise<void> {
-    try {
-      // Create voice_bridge_sessions table with proper naming
-      await this.sql`
-        CREATE TABLE IF NOT EXISTS voice_bridge_sessions (
-          session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          user_one_language VARCHAR(50) NOT NULL,
-          user_two_language VARCHAR(50) NOT NULL,
-          user_one_voice_preference VARCHAR(100) NOT NULL,
-          user_two_voice_preference VARCHAR(100) NOT NULL,
-          session_started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          session_ended_at TIMESTAMP WITH TIME ZONE,
-          total_translations INTEGER DEFAULT 0,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        )
-      `;
-
-      // Create voice_bridge_translations table with proper naming
-      await this.sql`
-        CREATE TABLE IF NOT EXISTS voice_bridge_translations (
-          translation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          voice_bridge_session_id UUID REFERENCES voice_bridge_sessions(session_id) ON DELETE CASCADE,
-          speaker_identifier VARCHAR(20) NOT NULL CHECK (speaker_identifier IN ('user_one', 'user_two')),
-          original_speech_text TEXT NOT NULL,
-          translated_speech_text TEXT NOT NULL,
-          source_language VARCHAR(50) NOT NULL,
-          target_language VARCHAR(50) NOT NULL,
-          voice_synthesis_id VARCHAR(100) NOT NULL,
-          audio_duration_seconds DECIMAL(10,2),
-          translation_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        )
-      `;
-
-      // Create performance indexes with descriptive names
-      await this.sql`
-        CREATE INDEX IF NOT EXISTS idx_voice_bridge_translations_session_lookup 
-        ON voice_bridge_translations(voice_bridge_session_id)
-      `;
-
-      await this.sql`
-        CREATE INDEX IF NOT EXISTS idx_voice_bridge_translations_chronological 
-        ON voice_bridge_translations(translation_timestamp DESC)
-      `;
-
-      await this.sql`
-        CREATE INDEX IF NOT EXISTS idx_voice_bridge_sessions_chronological 
-        ON voice_bridge_sessions(session_started_at DESC)
-      `;
-
-      await this.sql`
-        CREATE INDEX IF NOT EXISTS idx_voice_bridge_sessions_active_lookup 
-        ON voice_bridge_sessions(session_ended_at) WHERE session_ended_at IS NULL
-      `;
-
-      // Create trigger to update translation count
-      await this.sql`
-        CREATE OR REPLACE FUNCTION update_session_translation_count()
-        RETURNS TRIGGER AS $$
-        BEGIN
-          UPDATE voice_bridge_sessions 
-          SET total_translations = (
-            SELECT COUNT(*) 
-            FROM voice_bridge_translations 
-            WHERE voice_bridge_session_id = NEW.voice_bridge_session_id
-          ),
-          updated_at = NOW()
-          WHERE session_id = NEW.voice_bridge_session_id;
-          RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-      `;
-
-      // Drop and recreate trigger safely
-      try {
-        await this.sql`
-          DROP TRIGGER IF EXISTS trigger_update_translation_count ON voice_bridge_translations
-        `;
-      } catch (dropError: any) {
-        // Ignore drop errors as trigger might not exist
-        console.log('Trigger drop info:', dropError.message);
-      }
-      
-      try {
-        await this.sql`
-          CREATE TRIGGER trigger_update_translation_count
-          AFTER INSERT ON voice_bridge_translations
-          FOR EACH ROW EXECUTE FUNCTION update_session_translation_count()
-        `;
-      } catch (createError: any) {
-        // Check if trigger already exists, if so, continue
-        if (!createError.message.includes('already exists')) {
-          throw createError;
-        }
-        console.log('Trigger already exists, continuing...');
-      }
-
-      // Create user_language_preferences table with full production constraints
-      await this.sql`
-        CREATE TABLE IF NOT EXISTS user_language_preferences (
-          preference_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          user_identifier VARCHAR(100) NOT NULL,
-          from_language VARCHAR(10) NOT NULL CHECK (length(from_language) >= 2),
-          to_language VARCHAR(10) NOT NULL CHECK (length(to_language) >= 2),
-          voice_preference VARCHAR(100) NOT NULL,
-          is_default BOOLEAN DEFAULT false,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          CONSTRAINT unique_user_lang_pair UNIQUE(user_identifier, from_language, to_language),
-          CONSTRAINT different_languages CHECK (from_language != to_language)
-        )
-      `;
-
-      // Create optimized indexes for real-world performance
-      await this.sql`
-        CREATE INDEX IF NOT EXISTS idx_user_language_preferences_user_lookup 
-        ON user_language_preferences(user_identifier)
-      `;
-
-      await this.sql`
-        CREATE INDEX IF NOT EXISTS idx_user_language_preferences_default 
-        ON user_language_preferences(user_identifier, is_default) WHERE is_default = true
-      `;
-
-      // Create trigger to ensure only one default per user
-      await this.sql`
-        CREATE OR REPLACE FUNCTION ensure_single_default_preference()
-        RETURNS TRIGGER AS $$
-        BEGIN
-          IF NEW.is_default = true THEN
-            UPDATE user_language_preferences 
-            SET is_default = false, updated_at = NOW()
-            WHERE user_identifier = NEW.user_identifier 
-              AND preference_id != NEW.preference_id
-              AND is_default = true;
-          END IF;
-          RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-      `;
-
-      await this.sql`
-        DROP TRIGGER IF EXISTS trigger_ensure_single_default ON user_language_preferences
-      `;
-
-      await this.sql`
-        CREATE TRIGGER trigger_ensure_single_default
-        BEFORE INSERT OR UPDATE ON user_language_preferences
-        FOR EACH ROW EXECUTE FUNCTION ensure_single_default_preference()
-      `;
-
-    } catch (error) {
-      console.error('Error initializing Neon database:', error);
-      throw new Error('Failed to initialize Voice Bridge database');
+    if (NeonService.initializationPromise) {
+      return NeonService.initializationPromise;
     }
+    
+    NeonService.initializationPromise = this._initializeDatabase();
+    return NeonService.initializationPromise;
   }
 
   async createVoiceBridgeSession(
@@ -503,9 +357,62 @@ class NeonService {
       throw new Error(`Failed to delete language preference: ${error instanceof Error ? error.message : 'Database error'}`);
     }
   }
+
+  /**
+   * Insert a comment into the database for testing connection
+   * @param comment The comment text to insert
+   * @returns Promise<string> The ID of the inserted comment
+   */
+  async insertComment(comment: string): Promise<string> {
+    if (!comment?.trim()) {
+      throw new Error('Comment text is required');
+    }
+
+    try {
+      const result = await this.sql`
+        INSERT INTO comments (comment)
+        VALUES (${comment.trim()})
+        RETURNING id
+      `;
+
+      return (result as any[])[0].id;
+    } catch (error) {
+      console.error('Error inserting comment:', error);
+      throw new Error(`Failed to insert comment: ${error instanceof Error ? error.message : 'Database error'}`);
+    }
+  }
+
+  /**
+   * Get all comments from the database
+   * @param limit Maximum number of comments to retrieve
+   * @returns Promise<Comment[]> Array of comments
+   */
+  async getComments(limit: number = 10): Promise<Comment[]> {
+    try {
+      const comments = await this.sql`
+        SELECT id, comment, created_at
+        FROM comments
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+
+      return comments as Comment[];
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      throw new Error(`Failed to fetch comments: ${error instanceof Error ? error.message : 'Database error'}`);
+    }
+  }
+}
+
+// Add Comment interface
+interface Comment {
+  id: string;
+  comment: string;
+  created_at: string;
 }
 
 export default NeonService;
+export type { Comment };
 
 // Add missing interface
 interface UserLanguagePreference {

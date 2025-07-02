@@ -53,7 +53,8 @@ class GeminiService {
           }]
         }],
         generationConfig: {
-          temperature: parseFloat(process.env.VITE_GEMINI_TRANSCRIPTION_TEMPERATURE || '0.1'),
+          // Line 56: Replace process.env with getApiKey
+          temperature: parseFloat(getApiKey('GEMINI_TRANSCRIPTION_TEMPERATURE') || '0.1'),
           topK: 1,
           topP: 0.8,
           maxOutputTokens: 1024,
@@ -176,7 +177,8 @@ class GeminiService {
           }]
         }],
         generationConfig: {
-          temperature: parseFloat(process.env.VITE_GEMINI_TRANSLATION_TEMPERATURE || '0.3'),
+          // Line 179: Replace process.env with getApiKey  
+          temperature: parseFloat(getApiKey('GEMINI_TRANSLATION_TEMPERATURE') || '0.3'),
           topK: 1,
           topP: 0.8,
           maxOutputTokens: 1024,

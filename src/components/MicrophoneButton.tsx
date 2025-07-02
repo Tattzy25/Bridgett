@@ -1,31 +1,43 @@
-// Add disabled prop to interface
+import React from 'react';
+
 interface MicrophoneButtonProps {
   isRecording: boolean;
   onStartRecording: () => Promise<void>;
   onStopRecording: () => Promise<void>;
-  disabled?: boolean; // Add this prop
+  disabled?: boolean;
 }
-
-// Remove unused useState import
-import React from 'react';
 
 const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
   onStartRecording,
   onStopRecording,
-  isRecording
+  isRecording,
+  disabled = false
 }) => {
-  const handleClick = () => {
-    if (isRecording) {
-      onStopRecording();
-    } else {
-      onStartRecording();
+  const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (disabled) return;
+    
+    try {
+      if (isRecording) {
+        await onStopRecording();
+      } else {
+        await onStartRecording();
+      }
+    } catch (error) {
+      console.error('Microphone button error:', error);
     }
   };
 
   return (
     <button
+      type="button"
       onClick={handleClick}
-      className="flex-shrink-0 transition-all duration-200 hover:scale-105 active:scale-95"
+      disabled={disabled}
+      className={`flex-shrink-0 transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
+        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+      }`}
       style={{
         width: '100px',
         height: '100px',
@@ -39,9 +51,11 @@ const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
         justifyContent: 'center',
         position: 'relative',
         border: 'none',
-        cursor: 'pointer'
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        pointerEvents: disabled ? 'none' : 'auto'
       }}
       aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+      aria-pressed={isRecording}
     >
       {/* Inner circle with inset effect */}
       <div 
@@ -55,12 +69,14 @@ const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
             : 'inset 6px 6px 12px #bebebe, inset -6px -6px 12px #ffffff',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          pointerEvents: 'none'
         }}
       >
         <span style={{ 
           fontSize: '24px',
-          color: isRecording ? '#fff' : '#666'
+          color: isRecording ? '#fff' : '#666',
+          userSelect: 'none'
         }}>
           {isRecording ? '⏹' : '🎤'}
         </span>

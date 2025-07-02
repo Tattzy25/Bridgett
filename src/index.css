@@ -20,3 +20,13 @@
 .translation-layout {
   gap: clamp(1rem, 4vw, 2rem);
 }
+
+/* Hide scrollbar for language dropdown */
+.scrollbar-hidden {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none; /* WebKit */
+}

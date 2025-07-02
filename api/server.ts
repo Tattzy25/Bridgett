@@ -10,6 +10,7 @@ import * as Ably from 'ably';
 import { getApiKey, validateProductionEnvironment } from '../src/config/apiKeys';
 import LoggingService, { LogLevel } from '../src/services/loggingService';
 import { EventType } from '../src/services/eventService';
+import fetch from 'node-fetch';
 
 // Initialize logger
 const logger = LoggingService.getInstance();
@@ -313,3 +314,83 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Start the server
 startServer();
+
+// DeepL Languages Proxy
+app.get('/api/languages', async (req, res) => {
+  try {
+    const { type } = req.query;
+    
+    if (!type || (type !== 'source' && type !== 'target')) {
+      return res.status(400).json({ error: 'Invalid type parameter' });
+    }
+
+    const deepLApiKey = getApiKey('DEEPL_API_KEY');
+    const deepLBaseUrl = getApiKey('DEEPL_API_URL') || 'https://api-free.deepl.com/v2';
+    
+    if (!deepLApiKey) {
+      return res.status(500).json({ error: 'DeepL API key not configured' });
+    }
+
+    const response = await fetch(`${deepLBaseUrl}/languages?type=${type}`, {
+      headers: {
+        'Authorization': `DeepL-Auth-Key ${deepLApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`DeepL API error: ${response.status}`);
+    }
+
+    const languages = await response.json();
+    res.json(languages);
+  } catch (error) {
+    logger.error('Failed to fetch languages', 'api', error);
+    res.status(500).json({ error: 'Failed to fetch languages' });
+  }
+});
+
+// DeepL Translation Proxy
+app.post('/api/translate', async (req, res) => {
+  try {
+    const { text, target_lang, source_lang } = req.body;
+    
+    if (!text || !target_lang) {
+      return res.status(400).json({ error: 'text and target_lang required' });
+    }
+
+    const deepLApiKey = getApiKey('DEEPL_API_KEY');
+    const deepLBaseUrl = getApiKey('DEEPL_API_URL') || 'https://api-free.deepl.com/v2';
+    
+    if (!deepLApiKey) {
+      return res.status(500).json({ error: 'DeepL API key not configured' });
+    }
+
+    const formData = new URLSearchParams({
+      text,
+      target_lang,
+      ...(source_lang && { source_lang })
+    });
+
+    const response = await fetch(`${deepLBaseUrl}/translate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `DeepL-Auth-Key ${deepLApiKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData,
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`DeepL API error: ${response.status}`);
+    }
+
+    const translation = await response.json();
+    res.json(translation);
+  } catch (error) {
+    logger.error('Failed to translate', 'api', error);
+    res.status(500).json({ error: 'Failed to translate' });
+  }
+});

@@ -12,7 +12,7 @@ interface TranslationCardProps {
   className?: string;
 }
 
-const TranslationCard: React.FC<TranslationCardProps> = ({ cardId, className }) => {
+const TranslationCard: React.FC<TranslationCardProps> = ({ cardId, className = '' }) => {
   const [inputText, setInputText] = useState('');
   
   const {
@@ -95,12 +95,12 @@ const TranslationCard: React.FC<TranslationCardProps> = ({ cardId, className }) 
       case TranslationState.TRANSCRIBING: return 'Processing...';
       case TranslationState.TRANSLATING: return 'Translating...';
       case TranslationState.SPEAKING: return 'Speaking...';
-      default: return translatedText || 'Translation will appear here';
+      default: return 'Translation will appear here';
     }
   };
 
   return (
-    <NeumorphicCard className={className}>
+    <NeumorphicCard className={`p-6 ${className}`}>
       {/* Language Selector */}
       <LanguageSelector
         fromLanguage={fromLanguage}
@@ -120,13 +120,13 @@ const TranslationCard: React.FC<TranslationCardProps> = ({ cardId, className }) 
         className="mb-4"
       />
       
-      {/* Status Indicator - Smaller and centered */}
+      {/* Status Indicator - Where "Translation will appear here" was */}
       <div 
         className="mx-auto mb-4 px-4 py-2 text-sm text-center flex items-center justify-center"
         style={{
           width: '80%',
           height: '40px',
-          borderRadius: '8px', // Square corners
+          borderRadius: '8px',
           background: '#e0e0e0',
           boxShadow: 'inset 3px 3px 6px #bebebe, inset -3px -3px 6px #ffffff',
           color: error ? '#ef4444' : '#666',
@@ -137,7 +137,7 @@ const TranslationCard: React.FC<TranslationCardProps> = ({ cardId, className }) 
         {getStatusText()}
       </div>
       
-      {/* Microphone Button - Below status indicator */}
+      {/* Single Microphone Button */}
       <MicrophoneButton
         isRecording={isRecording}
         onStartRecording={handleStartRecording}

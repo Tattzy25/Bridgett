@@ -22,12 +22,15 @@ interface DeepLUsageResponse {
 class DeepLService {
   private apiKey: string;
   private baseUrl: string;
+  private serverUrl: string; // Add this
   private supportedLanguages: Map<string, DeepLLanguage> = new Map();
   private logger = LoggingService.getInstance();
 
   constructor() {
     this.apiKey = getApiKey('DEEPL_API_KEY');
     this.baseUrl = getApiKey('DEEPL_API_URL') || 'https://api-free.deepl.com/v2';
+    // Add server URL - use your server instead of direct API calls
+    this.serverUrl = window.location.origin; // This will use the same origin as your frontend
     
     if (!this.apiKey) {
       throw new Error('DEEPL_API_KEY is required. Please configure your environment variables.');
@@ -67,32 +70,30 @@ class DeepLService {
   }
 
   async getSourceLanguages(): Promise<DeepLLanguage[]> {
-    const response = await fetch(`${this.baseUrl}/languages?type=source`, {
+    const response = await fetch(`${this.serverUrl}/api/languages?type=source`, {
       headers: {
-        'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
       signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
-      throw new Error(`DeepL API error: ${response.status} ${response.statusText}`);
+      throw new Error(`Server API error: ${response.status} ${response.statusText}`);
     }
 
     return await response.json();
   }
 
   async getTargetLanguages(): Promise<DeepLLanguage[]> {
-    const response = await fetch(`${this.baseUrl}/languages?type=target`, {
+    const response = await fetch(`${this.serverUrl}/api/languages?type=target`, {
       headers: {
-        'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
       signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
-      throw new Error(`DeepL API error: ${response.status} ${response.statusText}`);
+      throw new Error(`Server API error: ${response.status} ${response.statusText}`);
     }
 
     return await response.json();
@@ -108,38 +109,30 @@ class DeepLService {
     }
 
     try {
-      const formData = new FormData();
-      formData.append('text', text.trim());
-      formData.append('target_lang', this.normalizeLanguageCode(targetLanguage));
-      
-      if (sourceLanguage) {
-        formData.append('source_lang', this.normalizeLanguageCode(sourceLanguage));
-      }
-
-      formData.append('preserve_formatting', '1');
-      formData.append('formality', 'default');
-
-      const response = await fetch(`${this.baseUrl}/translate`, {
+      const response = await fetch(`${this.serverUrl}/api/translate`, {
         method: 'POST',
         headers: {
-          'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
+          'Content-Type': 'application/json',
         },
-        body: formData,
-        signal: AbortSignal.timeout(15000),
+        body: JSON.stringify({
+          text: text.trim(),
+          target_lang: this.normalizeLanguageCode(targetLanguage),
+          ...(sourceLanguage && { source_lang: this.normalizeLanguageCode(sourceLanguage) })
+        }),
+        signal: AbortSignal.timeout(30000),
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`DeepL translation error: ${response.status} - ${errorText}`);
+        throw new Error(`Server API error: ${response.status} ${response.statusText}`);
       }
 
-      const data: DeepLTranslationResponse = await response.json();
+      const result: DeepLTranslationResponse = await response.json();
 
-      if (!data.translations || data.translations.length === 0) {
+      if (!result.translations || result.translations.length === 0) {
         throw new Error('No translation received from DeepL');
       }
 
-      const translation = data.translations[0];
+      const translation = result.translations[0];
       
       this.logger.info(`Translation completed: ${text.substring(0, 50)}... -> ${translation.text.substring(0, 50)}...`);
 
