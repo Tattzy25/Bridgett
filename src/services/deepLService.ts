@@ -1,4 +1,5 @@
 import { getApiKey } from '../config/apiKeys';
+import LoggingService from './loggingService';
 
 interface DeepLLanguage {
   language: string;
@@ -13,7 +14,6 @@ interface DeepLTranslationResponse {
   }>;
 }
 
-
 interface DeepLUsageResponse {
   character_count: number;
   character_limit: number;
@@ -23,179 +23,88 @@ class DeepLService {
   private apiKey: string;
   private baseUrl: string;
   private supportedLanguages: Map<string, DeepLLanguage> = new Map();
-  private isApiAvailable: boolean = false;
+  private logger = LoggingService.getInstance();
 
   constructor() {
     this.apiKey = getApiKey('DEEPL_API_KEY');
     this.baseUrl = getApiKey('DEEPL_API_URL') || 'https://api-free.deepl.com/v2';
     
-    if (!this.apiKey || this.apiKey === 'your_deepl_api_key_here') {
-      console.warn('DeepL API key is not configured. Using fallback languages.');
-      this.initializeFallbackLanguages();
+    if (!this.apiKey) {
+      throw new Error('DEEPL_API_KEY is required. Please configure your environment variables.');
     }
+    
+    this.logger.configure({ contextPrefix: 'DeepLService' });
   }
 
   async initializeLanguages(): Promise<void> {
-    // Initialize fallback languages first
-    this.initializeFallbackLanguages();
-
-    // If no API key is configured, skip API calls
-    if (!this.apiKey || this.apiKey === 'your_deepl_api_key_here') {
-      console.info('DeepL API key not configured. Using fallback language list.');
-      return;
-    }
-
-    // NOTE: API connectivity tests were intentionally removed to improve startup performance.
-    // The FSM Orchestrator and agent system handle API management without upfront testing.
-    // DO NOT reintroduce testApiConnectivity() calls here - see ARCHITECTURE.md for details.
-    
     try {
-      // Try to get languages from API
       const [sourceLanguages, targetLanguages] = await Promise.all([
         this.getSourceLanguages(),
         this.getTargetLanguages()
       ]);
 
-      // Only update languages if we successfully got them from the API
-      if (sourceLanguages && targetLanguages) {
-        // Combine and deduplicate languages
-        const allLanguages = new Map<string, DeepLLanguage>();
-        
-        sourceLanguages.forEach(lang => {
+      const allLanguages = new Map<string, DeepLLanguage>();
+      
+      sourceLanguages.forEach(lang => {
+        allLanguages.set(lang.language, lang);
+      });
+      
+      targetLanguages.forEach(lang => {
+        if (allLanguages.has(lang.language)) {
+          const existing = allLanguages.get(lang.language)!;
+          allLanguages.set(lang.language, { ...existing, ...lang });
+        } else {
           allLanguages.set(lang.language, lang);
-        });
-        
-        targetLanguages.forEach(lang => {
-          if (allLanguages.has(lang.language)) {
-            // Merge properties if language exists in both
-            const existing = allLanguages.get(lang.language)!;
-            allLanguages.set(lang.language, { ...existing, ...lang });
-          } else {
-            allLanguages.set(lang.language, lang);
-          }
-        });
+        }
+      });
 
-        this.supportedLanguages = allLanguages;
-        this.isApiAvailable = true;
-        console.info(`DeepL API connected successfully. ${allLanguages.size} languages available.`);
-      }
+      this.supportedLanguages = allLanguages;
+      this.logger.info(`DeepL API initialized successfully. ${allLanguages.size} languages available.`);
     } catch (error) {
-      console.warn('DeepL API is not available. Using fallback languages.', error);
-      this.isApiAvailable = false;
-      // Fallback languages are already initialized, so we don't need to do anything else
+      this.logger.error('Failed to initialize DeepL languages', 'initialization', error);
+      throw new Error('DeepL API initialization failed. Please check your API key and network connection.');
     }
-  }
-
-
-
-  private initializeFallbackLanguages(): void {
-    const fallbackLanguages: DeepLLanguage[] = [
-      { language: 'EN', name: 'English' },
-      { language: 'ES', name: 'Spanish' },
-      { language: 'FR', name: 'French' },
-      { language: 'DE', name: 'German' },
-      { language: 'IT', name: 'Italian' },
-      { language: 'PT', name: 'Portuguese' },
-      { language: 'RU', name: 'Russian' },
-      { language: 'JA', name: 'Japanese' },
-      { language: 'KO', name: 'Korean' },
-      { language: 'ZH', name: 'Chinese' },
-      { language: 'AR', name: 'Arabic' },
-      { language: 'HI', name: 'Hindi' },
-      { language: 'NL', name: 'Dutch' },
-      { language: 'PL', name: 'Polish' },
-      { language: 'SV', name: 'Swedish' },
-      { language: 'DA', name: 'Danish' },
-      { language: 'FI', name: 'Finnish' },
-      { language: 'NO', name: 'Norwegian' },
-      { language: 'CS', name: 'Czech' },
-      { language: 'HU', name: 'Hungarian' },
-      { language: 'RO', name: 'Romanian' },
-      { language: 'SK', name: 'Slovak' },
-      { language: 'SL', name: 'Slovenian' },
-      { language: 'BG', name: 'Bulgarian' },
-      { language: 'ET', name: 'Estonian' },
-      { language: 'LV', name: 'Latvian' },
-      { language: 'LT', name: 'Lithuanian' },
-      { language: 'UK', name: 'Ukrainian' },
-      { language: 'TR', name: 'Turkish' },
-      { language: 'EL', name: 'Greek' },
-      { language: 'ID', name: 'Indonesian' },
-      { language: 'MS', name: 'Malay' },
-      { language: 'TH', name: 'Thai' },
-      { language: 'VI', name: 'Vietnamese' },
-    ];
-
-    this.supportedLanguages.clear();
-    fallbackLanguages.forEach(lang => {
-      this.supportedLanguages.set(lang.language, lang);
-    });
   }
 
   async getSourceLanguages(): Promise<DeepLLanguage[]> {
-    try {
-      const response = await fetch(`${this.baseUrl}/languages?type=source`, {
-        headers: {
-          'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-      });
+    const response = await fetch(`${this.baseUrl}/languages?type=source`, {
+      headers: {
+        'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
 
-      if (!response.ok) {
-        throw new Error(`DeepL API error: ${response.status} ${response.statusText}`);
-      }
-
-      const languages: DeepLLanguage[] = await response.json();
-      return languages;
-    } catch (error) {
-      console.error('Error fetching DeepL source languages:', error);
-      throw error; // Re-throw to be handled by initializeLanguages
+    if (!response.ok) {
+      throw new Error(`DeepL API error: ${response.status} ${response.statusText}`);
     }
+
+    return await response.json();
   }
 
   async getTargetLanguages(): Promise<DeepLLanguage[]> {
-    try {
-      const response = await fetch(`${this.baseUrl}/languages?type=target`, {
-        headers: {
-          'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-      });
+    const response = await fetch(`${this.baseUrl}/languages?type=target`, {
+      headers: {
+        'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
 
-      if (!response.ok) {
-        throw new Error(`DeepL API error: ${response.status} ${response.statusText}`);
-      }
-
-      const languages: DeepLLanguage[] = await response.json();
-      return languages;
-    } catch (error) {
-      console.error('Error fetching DeepL target languages:', error);
-      throw error; // Re-throw to be handled by initializeLanguages
+    if (!response.ok) {
+      throw new Error(`DeepL API error: ${response.status} ${response.statusText}`);
     }
+
+    return await response.json();
   }
 
-  // Replace mock translations with proper error handling
   async translateText(text: string, targetLanguage: string, sourceLanguage?: string) {
-    if (!this.isApiAvailable) {
-      throw new Error('DeepL API is not available. Please check your API key configuration.');
-    }
     if (!text.trim()) {
       throw new Error('Text to translate cannot be empty');
     }
 
     if (!targetLanguage) {
       throw new Error('Target language is required');
-    }
-
-    // If API is not available, return a mock translation
-    if (!this.isApiAvailable) {
-      console.warn('DeepL API not available. Returning mock translation.');
-      return {
-        translatedText: `[Mock Translation] ${text}`,
-        detectedSourceLanguage: sourceLanguage || 'EN',
-      };
     }
 
     try {
@@ -207,7 +116,6 @@ class DeepLService {
         formData.append('source_lang', this.normalizeLanguageCode(sourceLanguage));
       }
 
-      // Additional parameters for better translation quality
       formData.append('preserve_formatting', '1');
       formData.append('formality', 'default');
 
@@ -217,7 +125,7 @@ class DeepLService {
           'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
         },
         body: formData,
-        signal: AbortSignal.timeout(15000), // 15 second timeout for translation
+        signal: AbortSignal.timeout(15000),
       });
 
       if (!response.ok) {
@@ -232,40 +140,20 @@ class DeepLService {
       }
 
       const translation = data.translations[0];
+      
+      this.logger.info(`Translation completed: ${text.substring(0, 50)}... -> ${translation.text.substring(0, 50)}...`);
 
       return {
         translatedText: translation.text,
         detectedSourceLanguage: translation.detected_source_language,
       };
     } catch (error) {
-      console.error('Error translating with DeepL:', error);
-      
-      // Fallback to mock translation if API fails
-      if (error instanceof Error && (
-        error.message.includes('Failed to fetch') ||
-        error.message.includes('timeout') ||
-        error.message.includes('Network error')
-      )) {
-        console.warn('DeepL API request failed. Returning mock translation.');
-        return {
-          translatedText: `[Translation Unavailable] ${text}`,
-          detectedSourceLanguage: sourceLanguage || 'EN',
-        };
-      }
-      
-      throw new Error('Failed to translate text with DeepL');
+      this.logger.error('Translation failed', 'translateText', { text: text.substring(0, 100), targetLanguage, error });
+      throw new Error(`Translation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   async getUsageInfo(): Promise<DeepLUsageResponse> {
-    if (!this.isApiAvailable) {
-      // Return mock usage info when API is not available
-      return {
-        character_count: 0,
-        character_limit: 500000,
-      };
-    }
-
     try {
       const response = await fetch(`${this.baseUrl}/usage`, {
         headers: {
@@ -280,47 +168,25 @@ class DeepLService {
 
       return await response.json();
     } catch (error) {
-      console.error('Error fetching DeepL usage info:', error);
+      this.logger.error('Failed to fetch usage info', 'getUsageInfo', error);
       throw new Error('Failed to fetch DeepL usage information');
     }
   }
 
   getSupportedLanguages(): Array<{ code: string; name: string; flag: string }> {
+    if (this.supportedLanguages.size === 0) {
+      this.logger.warn('No languages loaded from API, using fallback list');
+      return this.getFallbackLanguages();
+    }
+
     const languageFlags: { [key: string]: string } = {
-      'EN': '🇺🇸',
-      'ES': '🇪🇸', 
-      'FR': '🇫🇷',
-      'DE': '🇩🇪',
-      'IT': '🇮🇹',
-      'PT': '🇧🇷',
-      'RU': '🇷🇺',
-      'JA': '🇯🇵',
-      'KO': '🇰🇷',
-      'ZH': '🇨🇳',
-      'AR': '🇸🇦',
-      'HI': '🇮🇳',
-      'NL': '🇳🇱',
-      'PL': '🇵🇱',
-      'SV': '🇸🇪',
-      'DA': '🇩🇰',
-      'FI': '🇫🇮',
-      'NO': '🇳🇴',
-      'CS': '🇨🇿',
-      'HU': '🇭🇺',
-      'RO': '🇷🇴',
-      'SK': '🇸🇰',
-      'SL': '🇸🇮',
-      'BG': '🇧🇬',
-      'ET': '🇪🇪',
-      'LV': '🇱🇻',
-      'LT': '🇱🇹',
-      'UK': '🇺🇦',
-      'TR': '🇹🇷',
-      'EL': '🇬🇷',
-      'ID': '🇮🇩',
-      'MS': '🇲🇾',
-      'TH': '🇹🇭',
-      'VI': '🇻🇳',
+      'EN': '🇺🇸', 'ES': '🇪🇸', 'FR': '🇫🇷', 'DE': '🇩🇪', 'IT': '🇮🇹',
+      'PT': '🇧🇷', 'RU': '🇷🇺', 'JA': '🇯🇵', 'KO': '🇰🇷', 'ZH': '🇨🇳',
+      'AR': '🇸🇦', 'HI': '🇮🇳', 'NL': '🇳🇱', 'PL': '🇵🇱', 'SV': '🇸🇪',
+      'DA': '🇩🇰', 'FI': '🇫🇮', 'NO': '🇳🇴', 'CS': '🇨🇿', 'HU': '🇭🇺',
+      'RO': '🇷🇴', 'SK': '🇸🇰', 'SL': '🇸🇮', 'BG': '🇧🇬', 'ET': '🇪🇪',
+      'LV': '🇱🇻', 'LT': '🇱🇹', 'UK': '🇺🇦', 'TR': '🇹🇷', 'EL': '🇬🇷',
+      'ID': '🇮🇩', 'MS': '🇲🇾', 'TH': '🇹🇭', 'VI': '🇻🇳',
     };
 
     return Array.from(this.supportedLanguages.values()).map(lang => ({
@@ -330,43 +196,56 @@ class DeepLService {
     }));
   }
 
+  private getFallbackLanguages(): Array<{ code: string; name: string; flag: string }> {
+    return [
+      { code: 'EN', name: 'English', flag: '🇺🇸' },
+      { code: 'ES', name: 'Spanish', flag: '🇪🇸' },
+      { code: 'FR', name: 'French', flag: '🇫🇷' },
+      { code: 'DE', name: 'German', flag: '🇩🇪' },
+      { code: 'IT', name: 'Italian', flag: '🇮🇹' },
+      { code: 'PT', name: 'Portuguese', flag: '🇧🇷' },
+      { code: 'RU', name: 'Russian', flag: '🇷🇺' },
+      { code: 'JA', name: 'Japanese', flag: '🇯🇵' },
+      { code: 'KO', name: 'Korean', flag: '🇰🇷' },
+      { code: 'ZH', name: 'Chinese', flag: '🇨🇳' },
+      { code: 'AR', name: 'Arabic', flag: '🇸🇦' },
+      { code: 'HI', name: 'Hindi', flag: '🇮🇳' },
+      { code: 'NL', name: 'Dutch', flag: '🇳🇱' },
+      { code: 'PL', name: 'Polish', flag: '🇵🇱' },
+      { code: 'SV', name: 'Swedish', flag: '🇸🇪' },
+      { code: 'DA', name: 'Danish', flag: '🇩🇰' },
+      { code: 'FI', name: 'Finnish', flag: '🇫🇮' },
+      { code: 'NO', name: 'Norwegian', flag: '🇳🇴' },
+      { code: 'CS', name: 'Czech', flag: '🇨🇿' },
+      { code: 'HU', name: 'Hungarian', flag: '🇭🇺' },
+      { code: 'RO', name: 'Romanian', flag: '🇷🇴' },
+      { code: 'SK', name: 'Slovak', flag: '🇸🇰' },
+      { code: 'SL', name: 'Slovenian', flag: '🇸🇮' },
+      { code: 'BG', name: 'Bulgarian', flag: '🇧🇬' },
+      { code: 'ET', name: 'Estonian', flag: '🇪🇪' },
+      { code: 'LV', name: 'Latvian', flag: '🇱🇻' },
+      { code: 'LT', name: 'Lithuanian', flag: '🇱🇹' },
+      { code: 'UK', name: 'Ukrainian', flag: '🇺🇦' },
+      { code: 'TR', name: 'Turkish', flag: '🇹🇷' },
+      { code: 'EL', name: 'Greek', flag: '🇬🇷' },
+      { code: 'ID', name: 'Indonesian', flag: '🇮🇩' },
+      { code: 'MS', name: 'Malay', flag: '🇲🇾' },
+      { code: 'TH', name: 'Thai', flag: '🇹🇭' },
+      { code: 'VI', name: 'Vietnamese', flag: '🇻🇳' }
+    ];
+  }
+
   private normalizeLanguageCode(language: string): string {
-    // Convert language names to DeepL codes
     const languageMap: { [key: string]: string } = {
-      'English': 'EN',
-      'Spanish': 'ES', 
-      'French': 'FR',
-      'German': 'DE',
-      'Italian': 'IT',
-      'Portuguese': 'PT',
-      'Russian': 'RU',
-      'Japanese': 'JA',
-      'Korean': 'KO',
-      'Chinese': 'ZH',
-      'Arabic': 'AR',
-      'Hindi': 'HI',  // Added missing comma here
-      'Dutch': 'NL',
-      'Polish': 'PL',
-      'Swedish': 'SV',
-      'Danish': 'DA',
-      'Finnish': 'FI',
-      'Norwegian': 'NO',
-      'Czech': 'CS',
-      'Hungarian': 'HU',
-      'Romanian': 'RO',
-      'Slovak': 'SK',
-      'Slovenian': 'SL',
-      'Bulgarian': 'BG',
-      'Estonian': 'ET',
-      'Latvian': 'LV',
-      'Lithuanian': 'LT',
-      'Ukrainian': 'UK',
-      'Turkish': 'TR',
-      'Greek': 'EL',
-      'Indonesian': 'ID',
-      'Malay': 'MS',
-      'Thai': 'TH',
-      'Vietnamese': 'VI',
+      'English': 'EN', 'Spanish': 'ES', 'French': 'FR', 'German': 'DE',
+      'Italian': 'IT', 'Portuguese': 'PT', 'Russian': 'RU', 'Japanese': 'JA',
+      'Korean': 'KO', 'Chinese': 'ZH', 'Arabic': 'AR', 'Hindi': 'HI',
+      'Dutch': 'NL', 'Polish': 'PL', 'Swedish': 'SV', 'Danish': 'DA',
+      'Finnish': 'FI', 'Norwegian': 'NO', 'Czech': 'CS', 'Hungarian': 'HU',
+      'Romanian': 'RO', 'Slovak': 'SK', 'Slovenian': 'SL', 'Bulgarian': 'BG',
+      'Estonian': 'ET', 'Latvian': 'LV', 'Lithuanian': 'LT', 'Ukrainian': 'UK',
+      'Turkish': 'TR', 'Greek': 'EL', 'Indonesian': 'ID', 'Malay': 'MS',
+      'Thai': 'TH', 'Vietnamese': 'VI',
     };
 
     return languageMap[language] || language.toUpperCase();
@@ -377,18 +256,9 @@ class DeepLService {
   }
 
   getApiStatus(): { available: boolean; message: string } {
-    if (!this.apiKey || this.apiKey === 'your_deepl_api_key_here') {
-      return {
-        available: false,
-        message: 'DeepL API key not configured. Using fallback languages.',
-      };
-    }
-
     return {
-      available: this.isApiAvailable,
-      message: this.isApiAvailable 
-        ? 'DeepL API connected and ready'
-        : 'DeepL API unavailable. Using fallback languages.',
+      available: !!this.apiKey && this.supportedLanguages.size > 0,
+      message: `DeepL API ready with ${this.supportedLanguages.size} languages`,
     };
   }
 }

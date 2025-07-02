@@ -24,7 +24,6 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   onFromLanguageChange,
   onToLanguageChange,
   onSwapLanguages,
-  cardId
 }) => {
   const [languages, setLanguages] = useState<Language[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,7 +37,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         setLanguages(supportedLanguages);
       } catch (error) {
         console.error('Failed to load languages:', error);
-        // Fallback languages if service fails
+        // Enhanced fallback with all DeepL supported languages
         setLanguages([
           { code: 'EN', name: 'English', flag: '🇺🇸' },
           { code: 'ES', name: 'Spanish', flag: '🇪🇸' },
@@ -49,7 +48,31 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           { code: 'RU', name: 'Russian', flag: '🇷🇺' },
           { code: 'JA', name: 'Japanese', flag: '🇯🇵' },
           { code: 'KO', name: 'Korean', flag: '🇰🇷' },
-          { code: 'ZH', name: 'Chinese', flag: '🇨🇳' }
+          { code: 'ZH', name: 'Chinese', flag: '🇨🇳' },
+          { code: 'AR', name: 'Arabic', flag: '🇸🇦' },
+          { code: 'HI', name: 'Hindi', flag: '🇮🇳' },
+          { code: 'NL', name: 'Dutch', flag: '🇳🇱' },
+          { code: 'PL', name: 'Polish', flag: '🇵🇱' },
+          { code: 'SV', name: 'Swedish', flag: '🇸🇪' },
+          { code: 'DA', name: 'Danish', flag: '🇩🇰' },
+          { code: 'FI', name: 'Finnish', flag: '🇫🇮' },
+          { code: 'NO', name: 'Norwegian', flag: '🇳🇴' },
+          { code: 'CS', name: 'Czech', flag: '🇨🇿' },
+          { code: 'HU', name: 'Hungarian', flag: '🇭🇺' },
+          { code: 'RO', name: 'Romanian', flag: '🇷🇴' },
+          { code: 'SK', name: 'Slovak', flag: '🇸🇰' },
+          { code: 'SL', name: 'Slovenian', flag: '🇸🇮' },
+          { code: 'BG', name: 'Bulgarian', flag: '🇧🇬' },
+          { code: 'ET', name: 'Estonian', flag: '🇪🇪' },
+          { code: 'LV', name: 'Latvian', flag: '🇱🇻' },
+          { code: 'LT', name: 'Lithuanian', flag: '🇱🇹' },
+          { code: 'UK', name: 'Ukrainian', flag: '🇺🇦' },
+          { code: 'TR', name: 'Turkish', flag: '🇹🇷' },
+          { code: 'EL', name: 'Greek', flag: '🇬🇷' },
+          { code: 'ID', name: 'Indonesian', flag: '🇮🇩' },
+          { code: 'MS', name: 'Malay', flag: '🇲🇾' },
+          { code: 'TH', name: 'Thai', flag: '🇹🇭' },
+          { code: 'VI', name: 'Vietnamese', flag: '🇻🇳' }
         ]);
       } finally {
         setIsLoading(false);

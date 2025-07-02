@@ -1,5 +1,6 @@
+// Remove the unused DeepLService import
 import { useState, useEffect, useCallback } from 'react';
-import DeepLService from '../services/deepLService'; // Fixed: default import instead of named import
+// import DeepLService from '../services/deepLService'; // Remove this line
 import { useLanguagePreferences } from './useLanguagePreferences';
 
 interface UseCardLanguageStateReturn {
@@ -13,7 +14,8 @@ interface UseCardLanguageStateReturn {
 export const useCardLanguageState = (cardId: string): UseCardLanguageStateReturn => {
   const [fromLanguage, setFromLanguageState] = useState('EN');
   const [toLanguage, setToLanguageState] = useState('ES');
-  const deepLService = new DeepLService();
+  // Remove or comment out the unused deepLService declaration
+  // const deepLService = new DeepLService();
   const { defaultPreference, savePreference } = useLanguagePreferences(cardId);
 
   // Load default preferences on mount

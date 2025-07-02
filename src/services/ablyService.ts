@@ -27,8 +27,9 @@ class AblyService {
   private logger: LoggingService;
   private connectionState: AblyConnectionState;
   private currentSessionId: string | null = null;
-  private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
+  // Remove these unused variables:
+  // private reconnectAttempts: number = 0;
+  // private maxReconnectAttempts: number = 5;
 
   private constructor() {
     this.eventService = EventService.getInstance();
@@ -55,18 +56,22 @@ class AblyService {
   public async initialize(): Promise<void> {
     try {
       const apiKey = getApiKey('ABLY_API_KEY');
-      if (!apiKey || apiKey === 'your_ably_api_key_here') {
-        this.logger.warn('Ably API key not configured. Real-time features disabled.');
-        return;
+      
+      if (!apiKey || 
+          apiKey === 'your_ably_api_key_here' || 
+          apiKey.includes('your_') ||
+          apiKey.includes('_here') ||
+          apiKey.trim() === '') {
+        throw new Error('Ably API key is required and must be properly configured. Please check your API keys configuration.');
       }
 
       this.client = new Ably.Realtime({
         key: apiKey,
-        clientId: `bridgit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        clientId: this.connectionState.clientId,
         autoConnect: true,
-        recover: true,
-        disconnectedRetryTimeout: 5000,
-        suspendedRetryTimeout: 10000
+        // Remove the 'recover: true' line - it should be a string or callback
+        disconnectedRetryTimeout: 15000,
+        suspendedRetryTimeout: 30000
       });
 
       this.connectionState.clientId = this.client.auth.clientId || '';
@@ -157,12 +162,11 @@ class AblyService {
       clientId: this.connectionState.clientId
     };
 
-    this.channel.publish('state:changed', payload, (err) => {
-      if (err) {
-        this.logger.error('Failed to publish state', 'publish', err);
-      } else {
-        this.logger.debug(`Published state: ${state}`);
-      }
+    // Fix: Use promise-based approach instead of callback
+    this.channel.publish('state:changed', payload).then(() => {
+      this.logger.debug(`Published state: ${state}`);
+    }).catch((err) => {
+      this.logger.error('Failed to publish state', 'publish', err);
     });
   }
 
@@ -179,12 +183,11 @@ class AblyService {
       source: 'client'
     };
 
-    this.channel.publish('event', payload, (err) => {
-      if (err) {
-        this.logger.error(`Failed to publish event ${eventType}`, 'publish', err);
-      } else {
-        this.logger.debug(`Published event: ${eventType}`);
-      }
+    // Fix: Use promise-based approach instead of callback
+    this.channel.publish('event', payload).then(() => {
+      this.logger.debug(`Published event: ${eventType}`);
+    }).catch((err) => {
+      this.logger.error(`Failed to publish event ${eventType}`, 'publish', err);
     });
   }
 
@@ -220,46 +223,24 @@ class AblyService {
     this.client.connection.on('connected', () => {
       this.connectionState.connected = true;
       this.connectionState.connectionState = 'connected';
-      this.connectionState.lastError = undefined;
-      this.reconnectAttempts = 0;
-      
+      this.connectionState.clientId = this.client!.auth.clientId || '';
       this.logger.info('Connected to Ably');
-      this.eventService.publish(EventType.SERVICE_STATUS_CHANGED, {
-        service: 'ably',
-        status: 'connected',
-        clientId: this.connectionState.clientId
-      });
     });
 
     this.client.connection.on('disconnected', () => {
       this.connectionState.connected = false;
       this.connectionState.connectionState = 'disconnected';
-      
       this.logger.warn('Disconnected from Ably');
-      this.eventService.publish(EventType.SERVICE_STATUS_CHANGED, {
-        service: 'ably',
-        status: 'disconnected'
-      });
     });
 
     this.client.connection.on('failed', (error) => {
       this.connectionState.connected = false;
       this.connectionState.connectionState = 'failed';
-      this.connectionState.lastError = error.message;
-      
-      this.logger.error('Ably connection failed', 'connection', error);
-      this.eventService.publish(EventType.SERVICE_STATUS_CHANGED, {
-        service: 'ably',
-        status: 'failed',
-        error: error.message
+      // Fix: error handling
+      this.connectionState.lastError = error?.reason?.message || 'Connection failed';
+      this.logger.error('Ably connection failed', 'connection', {
+        error: error?.reason?.message || 'Unknown error'
       });
-    });
-
-    this.client.connection.on('suspended', () => {
-      this.connectionState.connected = false;
-      this.connectionState.connectionState = 'suspended';
-      
-      this.logger.warn('Ably connection suspended');
     });
   }
 
@@ -301,6 +282,7 @@ class AblyService {
 
   private subscribeToAppEvents(): void {
     const eventsToForward = [
+      EventType.STATE_CHANGED,
       EventType.RECORDING_STARTED,
       EventType.RECORDING_STOPPED,
       EventType.TRANSCRIPTION_COMPLETED,
@@ -310,10 +292,9 @@ class AblyService {
     ];
 
     eventsToForward.forEach(eventType => {
-      this.eventService.subscribe(eventType, (data, source) => {
-        if (source !== 'remote') {
-          this.publishEvent(eventType, data);
-        }
+      // Fix: EventService subscribe signature
+      this.eventService.subscribe(eventType, (data: any) => {
+        this.publishEvent(eventType, data);
       });
     });
   }

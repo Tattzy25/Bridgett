@@ -53,7 +53,7 @@ class GeminiService {
           }]
         }],
         generationConfig: {
-          temperature: 0.1,
+          temperature: parseFloat(process.env.VITE_GEMINI_TRANSCRIPTION_TEMPERATURE || '0.1'),
           topK: 1,
           topP: 0.8,
           maxOutputTokens: 1024,
@@ -176,7 +176,7 @@ class GeminiService {
           }]
         }],
         generationConfig: {
-          temperature: 0.3,
+          temperature: parseFloat(process.env.VITE_GEMINI_TRANSLATION_TEMPERATURE || '0.3'),
           topK: 1,
           topP: 0.8,
           maxOutputTokens: 1024,

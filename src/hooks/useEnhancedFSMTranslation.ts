@@ -33,7 +33,7 @@ export const useEnhancedFSMTranslation = (): UseEnhancedFSMTranslationReturn => 
   const [fromLanguage, setFromLanguage] = useState<string>('en');
   const [toLanguage, setToLanguage] = useState<string>('es');
   const [voiceId, setVoiceId] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [isConnected] = useState<boolean>(false); // Remove setIsConnected
   const [isFallbackMode, setIsFallbackMode] = useState<boolean>(false);
   const [apiStatuses, setApiStatuses] = useState<Map<string, any>>(new Map());
   

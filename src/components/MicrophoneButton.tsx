@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-
+// Add disabled prop to interface
 interface MicrophoneButtonProps {
-  onStartRecording: () => void;
-  onStopRecording: () => void;
   isRecording: boolean;
+  onStartRecording: () => Promise<void>;
+  onStopRecording: () => Promise<void>;
+  disabled?: boolean; // Add this prop
 }
+
+// Remove unused useState import
+import React from 'react';
 
 const MicrophoneButton: React.FC<MicrophoneButtonProps> = ({
   onStartRecording,

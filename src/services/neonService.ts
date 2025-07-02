@@ -415,7 +415,7 @@ class NeonService {
         RETURNING preference_id
       `;
 
-      return result[0].preference_id;
+      return (result as any[])[0].preference_id;
     } catch (error) {
       console.error('Error saving user language preference:', error);
       throw new Error(`Failed to save language preference: ${error instanceof Error ? error.message : 'Database error'}`);
@@ -450,6 +450,7 @@ class NeonService {
     }
   }
 
+  // Around line 474, fix the type casting:
   async getDefaultLanguagePreference(userIdentifier: string): Promise<UserLanguagePreference | null> {
     if (!userIdentifier?.trim()) {
       throw new Error('User identifier is required');
@@ -470,14 +471,17 @@ class NeonService {
         WHERE user_identifier = ${userIdentifier.trim()} AND is_default = true
         LIMIT 1
       `;
-
-      return result.length > 0 ? result[0] as UserLanguagePreference : null;
+  
+      // Fix the type casting and array access
+      const preferences = result as UserLanguagePreference[];
+      return preferences.length > 0 ? preferences[0] : null;
     } catch (error) {
       console.error('Error fetching default language preference:', error);
       throw new Error(`Failed to fetch default language preference: ${error instanceof Error ? error.message : 'Database error'}`);
     }
   }
 
+  // Fix the deleteUserLanguagePreference method around line 495
   async deleteUserLanguagePreference(preferenceId: string): Promise<void> {
     if (!preferenceId?.trim()) {
       throw new Error('Preference ID is required');
@@ -489,7 +493,9 @@ class NeonService {
         WHERE preference_id = ${preferenceId.trim()}
       `;
 
-      if (result.count === 0) {
+      // Fix the count property access
+      const deleteResult = result as any;
+      if (deleteResult.count === 0) {
         throw new Error('Language preference not found');
       }
     } catch (error) {
@@ -500,3 +506,15 @@ class NeonService {
 }
 
 export default NeonService;
+
+// Add missing interface
+interface UserLanguagePreference {
+  preference_id: string;
+  user_identifier: string;
+  from_language: string;
+  to_language: string;
+  voice_preference: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}

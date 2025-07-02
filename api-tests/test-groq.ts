@@ -1,7 +1,10 @@
 import * as dotenv from 'dotenv';
-import { join } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-// Load environment variables
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 dotenv.config({ path: join(__dirname, '..', '.env.local') });
 dotenv.config({ path: join(__dirname, '..', '.env.development.local') });
 dotenv.config({ path: join(__dirname, '..', '.env') });
@@ -62,7 +65,6 @@ async function testGroqAPI() {
   }
 }
 
-// Run the test
 testGroqAPI();
 
 export { testGroqAPI };

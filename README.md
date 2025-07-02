@@ -7,12 +7,7 @@ Break language barriers with Bridgit AI's intelligent real-time speech translati
 ### **Quick Setup**
 
 ```bash
-# Quick setup (recommended)
-npm run quick-start
-
-# Or manual setup
-npm run setup-env
-npm run dev
+pnpm run quick-start
 ```
 
 ### **Required API Keys**
@@ -39,7 +34,9 @@ npm run dev
 
 3. Start the development server:
    ```bash
-   npm run dev
+   pnpm install
+   pnpm run build
+   pnpm run dev
    ```
 
 ## 🎯 Features
@@ -106,8 +103,4 @@ npm run dev
 
 ## 📄 License
 
-This project is for educational and personal use. Please respect the terms of service of all integrated APIs.
-
----
-
-**Note**: Remember to set up your environment variables each time you start a new development session due to WebContainer limitations.
+Please respect the terms of service of all integrated APIs.

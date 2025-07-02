@@ -12,14 +12,16 @@ export type ApiKeyType =
   | 'ELEVENLABS_VOICE_ID'
   | 'ELEVENLABS_FEMALE_VOICE'
   | 'ELEVENLABS_MALE_VOICE'
-  | 'DEEPL_API_URL';
+  | 'DEEPL_API_URL'
+  | 'ABLY_API_KEY'
+  | 'SERVER_URL';
 
-// Default values for non-sensitive configuration
+// Default values for non-sensitive configuration only
 const DEFAULT_VALUES: Record<string, string> = {
-  'ELEVENLABS_VOICE_ID': '1GvTxqTIRSoKAPZZYJJe',
-  'ELEVENLABS_FEMALE_VOICE': 'EXAVITQu4vr4xnSDxMaL',
-  'ELEVENLABS_MALE_VOICE': '9PVP7ENhDskL0KYHAKtD',
-  'DEEPL_API_URL': 'https://api-free.deepl.com/v2'
+  'DEEPL_API_URL': 'https://api-free.deepl.com/v2',
+  'SERVER_URL': process.env.NODE_ENV === 'production' 
+    ? 'https://your-production-server.com' 
+    : 'http://localhost:3001'
 };
 
 // Helper function to get API keys from environment variables only
@@ -46,8 +48,10 @@ export const getApiKey = (key: ApiKeyType): string => {
 export const validateApiKeys = (): { valid: boolean; missing: string[] } => {
   const requiredKeys: ApiKeyType[] = [
     'ELEVENLABS_API_KEY',
+    'ELEVENLABS_VOICE_ID',
     'GROQ_API_KEY', 
     'DEEPL_API_KEY',
+    'GEMINI_API_KEY',
     'NEON_DATABASE_URL'
   ];
   
@@ -63,5 +67,38 @@ export const validateApiKeys = (): { valid: boolean; missing: string[] } => {
   return {
     valid: missing.length === 0,
     missing
+  };
+};
+
+// Production environment validation
+export const validateProductionEnvironment = (): { valid: boolean; issues: string[] } => {
+  const issues: string[] = [];
+  
+  // Check if we're in production
+  if (process.env.NODE_ENV === 'production') {
+    // Validate all required keys are present
+    const { valid, missing } = validateApiKeys();
+    if (!valid) {
+      issues.push(`Missing required API keys: ${missing.join(', ')}`);
+    }
+    
+    // Check for placeholder values in production
+    const allKeys: ApiKeyType[] = [
+      'ELEVENLABS_API_KEY', 'DEEPL_API_KEY', 'GROQ_API_KEY', 
+      'GEMINI_API_KEY', 'NEON_DATABASE_URL', 'ELEVENLABS_VOICE_ID',
+      'ABLY_API_KEY'
+    ];
+    
+    for (const key of allKeys) {
+      const value = getApiKey(key);
+      if (value && (value.includes('your_') || value.includes('_here') || value.includes('placeholder'))) {
+        issues.push(`${key} contains placeholder value in production`);
+      }
+    }
+  }
+  
+  return {
+    valid: issues.length === 0,
+    issues
   };
 };

@@ -1,4 +1,5 @@
-import React from 'react';
+// Remove unused React import if using React 17+
+// import React from 'react'; // Remove this line
 import TranslationCard from './components/TranslationCard';
 import logoImage from './components/bridgit ai logo.png';
 
