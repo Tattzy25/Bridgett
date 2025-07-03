@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import EnhancedFSMOrchestrator from '../services/enhancedFsmOrchestrator';
+import ProductionOrchestrator from '../services/productionOrchestrator';
 import { TranslationState, TranslationContext, TranslationError } from '../services/fsmOrchestrator';
 import { useNeonDatabase } from './useNeonDatabase';
 import { getApiKey } from '../config/apiKeys';
 
-export interface UseEnhancedFSMTranslationReturn {
+export interface UseProductionTranslationReturn {
+  orchestrator: ProductionOrchestrator;
   state: TranslationState;
   isRecording: boolean;
   isProcessing: boolean;
@@ -26,8 +27,8 @@ export interface UseEnhancedFSMTranslationReturn {
   setVoiceId: (voiceId: string) => void;
 }
 
-export const useEnhancedFSMTranslation = (): UseEnhancedFSMTranslationReturn => {
-  const [orchestrator, setOrchestrator] = useState<EnhancedFSMOrchestrator | null>(null);
+export const useProductionTranslation = (): UseProductionTranslationReturn => {
+  const [orchestrator, setOrchestrator] = useState<ProductionOrchestrator | null>(null);
   const [state, setState] = useState<TranslationState>(TranslationState.IDLE);
   const [context, setContext] = useState<TranslationContext | null>(null);
   const [fromLanguage, setFromLanguage] = useState<string>('en');
@@ -42,12 +43,12 @@ export const useEnhancedFSMTranslation = (): UseEnhancedFSMTranslationReturn => 
   // Initialize orchestrator
   useEffect(() => {
     const defaultVoiceId = getApiKey('ELEVENLABS_VOICE_ID');
-    const newOrchestrator = new EnhancedFSMOrchestrator(fromLanguage, toLanguage, defaultVoiceId);
+    const newOrchestrator = new ProductionOrchestrator(fromLanguage, toLanguage, defaultVoiceId);
     
     const stateChangeListener = (newState: TranslationState, newContext: TranslationContext) => {
       setState(newState);
       setContext(newContext);
-      setIsFallbackMode(newOrchestrator.isFallbackMode());
+      setIsFallbackMode(newOrchestrator.getFallbackMode());
       setApiStatuses(new Map(newOrchestrator.getApiStatuses()));
     };
     

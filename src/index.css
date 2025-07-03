@@ -30,3 +30,55 @@
 .scrollbar-hidden::-webkit-scrollbar {
   display: none; /* WebKit */
 }
+
+/* Neumorphic Button Colors */
+.host-btn {
+  color: #3035cb !important;
+}
+
+.host-btn:hover {
+  background-color: #3035cb !important;
+  color: #e4e4e4 !important;
+}
+
+.host-btn svg {
+  fill: #3035cb;
+}
+
+.host-btn:hover svg {
+  fill: #e4e4e4;
+}
+
+.join-btn {
+  color: #333 !important;
+}
+
+.join-btn:hover {
+  background-color: #333 !important;
+  color: #e4e4e4 !important;
+}
+
+.join-btn svg {
+  fill: #333;
+}
+
+.join-btn:hover svg {
+  fill: #e4e4e4;
+}
+
+.end-btn {
+  color: #b82323 !important;
+}
+
+.end-btn:hover {
+  background-color: #b82323 !important;
+  color: #e4e4e4 !important;
+}
+
+.end-btn svg {
+  fill: #b82323;
+}
+
+.end-btn:hover svg {
+  fill: #e4e4e4;
+}

@@ -1,71 +1,95 @@
-// Remove unused React import since you're using React 17+ JSX transform
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import TranslationCard from './components/TranslationCard';
 import SettingsMenu from './components/SettingsMenu';
+import { TranslationMode } from './components/SettingsMenu';
+import { useProductionTranslation } from './hooks/useProductionTranslation';
 import logoImage from './components/bridgit ai logo.png';
 
-function App() {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+const App: React.FC = () => {
+  const [translationMode, setTranslationMode] = useState<TranslationMode>('talk-together');
+  const [isMobile, setIsMobile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  
+  const productionTranslation = useProductionTranslation();
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
-  const handleSettingsToggle = () => {
-    setIsSettingsOpen(!isSettingsOpen);
-  };
-
-  const handleVoiceSettings = () => {
-    console.log('Voice settings triggered');
-    setIsSettingsOpen(false);
+  const handleModeChange = (mode: TranslationMode) => {
+    setTranslationMode(mode);
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#e0e0e0' }}>
-      <div className="flex items-center justify-center min-h-screen relative px-4 py-8">
-        {/* Mobile: Stack vertically, Tablet+: Side by side */}
-        <div className="flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-32 w-full max-w-7xl">
-          {/* Left Card */}
-          <TranslationCard 
-            cardId="card-1"
-            className="w-full max-w-sm lg:max-w-md xl:max-w-lg"
+    <div className="min-h-screen bg-gray-100 p-4">
+      {/* Header with your actual logo */}
+      <div className={`flex mb-6 ${
+        translationMode === 'talk-together' && !isMobile ? 'justify-center' : 'justify-center'
+      }`}>
+        <button
+          onClick={() => setShowSettings(true)}
+          className="w-16 h-16 rounded-full flex items-center justify-center overflow-hidden"
+          style={{
+            background: 'linear-gradient(145deg, #667eea 0%, #764ba2 100%)',
+            boxShadow: '8px 8px 16px #bebebe, -8px -8px 16px #ffffff'
+          }}
+        >
+          <img 
+            src={logoImage} 
+            alt="Bridgit AI Logo" 
+            className="w-12 h-12 object-contain"
           />
-          
-          {/* Right Card */}
-          <TranslationCard 
-            cardId="card-2"
-            className="w-full max-w-sm lg:max-w-md xl:max-w-lg"
-          />
-        </div>
-        
-        {/* Central Logo - Clickable Menu Button */}
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-          <button
-            onClick={handleSettingsToggle}
-            className="rounded-2xl sm:rounded-3xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 pointer-events-auto"
-            style={{
-              width: '80px',
-              height: '80px',
-              background: '#e0e0e0',
-              boxShadow: isSettingsOpen 
-                ? 'inset 8px 8px 16px #bebebe, inset -8px -8px 16px #ffffff'
-                : '20px 20px 60px #bebebe, -20px -20px 60px #ffffff'
-            }}
-            aria-label="Open settings menu"
-          >
-            <img 
-              src={logoImage} 
-              alt="Bridgit AI Logo" 
-              className="w-12 h-12 object-contain"
+        </button>
+      </div>
+
+      {/* Translation Cards */}
+      <div className="max-w-4xl mx-auto">
+        {translationMode === 'just-me' ? (
+          /* Single Card for Just Me Mode */
+          <div className="flex justify-center">
+            <TranslationCard 
+              cardId="single-card"
+              side="single" 
             />
-          </button>
-        </div>
+          </div>
+        ) : (
+          /* Dual Cards for Talk Together Mode */
+          <div className={`${
+            isMobile ? 'flex flex-col space-y-4' : 'grid grid-cols-2 gap-4'
+          }`}>
+            <TranslationCard 
+              cardId="card-1"
+              side={isMobile ? 'top' : 'left'} 
+              isFlipped={isMobile}
+              isMobile={isMobile}
+            />
+            <TranslationCard 
+              cardId="card-2"
+              side={isMobile ? 'bottom' : 'right'} 
+              isMobile={isMobile}
+            />
+          </div>
+        )}
       </div>
 
       {/* Settings Menu */}
       <SettingsMenu
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onVoiceSettings={handleVoiceSettings}
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onVoiceSettings={() => {/* handle voice settings */}}
+        onModeChange={handleModeChange}
+        currentMode={translationMode}
+        productionOrchestrator={productionTranslation.orchestrator}
       />
     </div>
   );
-}
+};
 
 export default App;

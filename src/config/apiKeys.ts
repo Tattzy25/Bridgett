@@ -20,7 +20,7 @@ export type ApiKeyType =
 const DEFAULT_VALUES: Record<string, string> = {
   'DEEPL_API_URL': 'https://api-free.deepl.com/v2',
   'SERVER_URL': process.env.NODE_ENV === 'production' 
-    ? 'https://your-production-server.com' 
+    ? process.env.VITE_SERVER_URL || 'https://api.bridgette-ai.com'
     : 'http://localhost:3001'
 };
 

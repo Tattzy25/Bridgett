@@ -26,7 +26,8 @@ interface VoiceBridgeTranslation {
 }
 
 class NeonService {
-  private sql: ReturnType<typeof neon>;
+  // Change from private to public
+  public sql: ReturnType<typeof neon>;
 
   constructor() {
     const databaseUrl = getApiKey('NEON_DATABASE_URL');
